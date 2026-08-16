@@ -10,47 +10,6 @@ const navLinks = [
   { label: "Kontak", href: "/contact", type: "route" as const },
 ];
 
-const Logo = ({ className = "" }: { className?: string }) => (
-  <svg
-    width="32"
-    height="32"
-    viewBox="0 0 32 32"
-    fill="none"
-    xmlns="http://www.w3.org/2000/svg"
-    className={className}
-    aria-hidden="true"
-  >
-    {/* Outer arc */}
-    <path
-      d="M4 16C4 9.373 9.373 4 16 4s12 5.373 12 12"
-      stroke="currentColor"
-      strokeWidth="2.5"
-      strokeLinecap="round"
-      className="text-primary"
-    />
-    {/* Mid arc */}
-    <path
-      d="M8 16c0-4.418 3.582-8 8-8s8 3.582 8 8"
-      stroke="currentColor"
-      strokeWidth="2.5"
-      strokeLinecap="round"
-      className="text-primary"
-      opacity="0.7"
-    />
-    {/* Inner arc */}
-    <path
-      d="M12 16c0-2.21 1.79-4 4-4s4 1.79 4 4"
-      stroke="currentColor"
-      strokeWidth="2.5"
-      strokeLinecap="round"
-      className="text-primary"
-      opacity="0.4"
-    />
-    {/* Center dot */}
-    <circle cx="16" cy="24" r="2.5" fill="currentColor" className="text-primary" />
-  </svg>
-);
-
 const Navbar = () => {
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -72,10 +31,16 @@ const Navbar = () => {
       <div className="container mx-auto flex items-center justify-between h-16 px-4 lg:px-8">
         {/* Brand */}
         <Link to="/" className="flex items-center gap-2 group">
-          <Logo />
-          <span className="text-lg font-extrabold tracking-tight text-foreground">
-            Hotspot <span className="text-primary">Portal</span>
-          </span>
+          <img
+            src="/brand/logo.png"
+            alt="Hotspot Portal"
+            className="h-8 w-8 object-contain"
+          />
+          <img
+            src="/brand/wordmark.png"
+            alt="Hotspot Portal"
+            className="h-6 object-contain hidden sm:block"
+          />
         </Link>
 
         {/* Desktop nav */}

@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { Twitter, Linkedin, Instagram, Wifi } from "lucide-react";
+import { Twitter, Linkedin, Instagram } from "lucide-react";
 
 const Footer = () => (
   <footer className="bg-slate-matte-950 text-slate-matte-300 pt-14 pb-8">
@@ -11,10 +11,16 @@ const Footer = () => (
         {/* Brand col — full width on mobile */}
         <div className="col-span-2 lg:col-span-1">
           <div className="flex items-center gap-2 mb-3">
-            <Wifi className="text-primary shrink-0" size={20} />
-            <span className="text-base font-bold text-slate-matte-50 leading-tight">
-              Hotspot Portal
-            </span>
+            <img
+              src="/brand/logo.png"
+              alt="Hotspot Portal"
+              className="h-7 w-7 object-contain"
+            />
+            <img
+              src="/brand/wordmark.png"
+              alt="Hotspot Portal"
+              className="h-5 object-contain"
+            />
           </div>
           <p className="text-sm leading-relaxed text-slate-matte-400 max-w-[260px]">
             Platform captive portal WiFi untuk monetisasi jaringan dan iklan digital lokal.
