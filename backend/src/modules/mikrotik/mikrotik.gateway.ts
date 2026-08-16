@@ -52,7 +52,7 @@ export class MikrotikGateway implements OnGatewayInit, OnGatewayConnection, OnGa
   ) {}
 
   afterInit(server: Server) {
-    this.logger.log('📡 WebSocket Gateway initialized');
+    this.logger.log('WebSocket gateway initialized');
     
     // Subscribe to Redis channels for multi-instance support
     this.setupRedisSubscriptions();
@@ -143,7 +143,7 @@ export class MikrotikGateway implements OnGatewayInit, OnGatewayConnection, OnGa
         connectedAt: new Date(),
       });
 
-      this.logger.log(`✅ Client connected: ${client.id} (${payload.username})`);
+      this.logger.log(`Client connected: ${client.id} (${payload.username})`);
 
       // Send connection confirmation
       client.emit('connected', {
@@ -165,7 +165,7 @@ export class MikrotikGateway implements OnGatewayInit, OnGatewayConnection, OnGa
       // Unsubscribe from all streams
       await this.mikrotikService.unsubscribeClient(client.id);
       
-      this.logger.log(`❌ Client disconnected: ${client.id} (${clientInfo.username})`);
+      this.logger.log(`Client disconnected: ${client.id} (${clientInfo.username})`);
       this.clients.delete(client.id);
     }
     
@@ -205,7 +205,7 @@ export class MikrotikGateway implements OnGatewayInit, OnGatewayConnection, OnGa
     }
 
     const { streamType, params } = data;
-    this.logger.log(`📡 Subscribe request: ${streamType} from ${client.id}`);
+    this.logger.log(`Stream subscribe request: ${streamType} from client ${client.id}`);
 
     let success = false;
     let tag = '';
@@ -262,7 +262,7 @@ export class MikrotikGateway implements OnGatewayInit, OnGatewayConnection, OnGa
 
     if (success) {
       clientInfo.subscribedStreams.add(tag);
-      this.logger.log(`✅ Subscribed ${client.id} to ${streamType}`);
+      this.logger.log(`Client ${client.id} subscribed to stream ${streamType}`);
     }
 
     return { success, streamType, tag };
@@ -300,7 +300,7 @@ export class MikrotikGateway implements OnGatewayInit, OnGatewayConnection, OnGa
     
     if (success) {
       clientInfo.subscribedStreams.delete(tag);
-      this.logger.log(`❌ Unsubscribed ${client.id} from ${streamType}`);
+      this.logger.log(`Client ${client.id} unsubscribed from stream ${streamType}`);
     }
 
     return { success, streamType };
@@ -315,7 +315,7 @@ export class MikrotikGateway implements OnGatewayInit, OnGatewayConnection, OnGa
       clientInfo.subscribedStreams.clear();
     }
 
-    this.logger.log(`❌ Unsubscribed ${client.id} from all streams`);
+    this.logger.log(`Client ${client.id} unsubscribed from all streams`);
     return { success: true };
   }
 

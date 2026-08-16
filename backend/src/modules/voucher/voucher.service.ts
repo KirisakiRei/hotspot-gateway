@@ -36,18 +36,16 @@ export class VoucherService {
   // ==========================================
 
   async createProfile(createDto: CreateVoucherProfileDto) {
-    this.logger.log(`🚀 START: createProfile(name="${createDto.name}")`);
+    this.logger.log(`Creating voucher profile: ${createDto.name}`);
     
     // STEP 1: Validate profile name (no spaces, dashes OK)
     const nameRegex = /^[a-zA-Z0-9_-]+$/;
     if (!nameRegex.test(createDto.name)) {
-      this.logger.warn(`❌ Invalid profile name: "${createDto.name}" (contains spaces or special chars)`);
+      this.logger.warn(`Invalid profile name: "${createDto.name}". Must only contain alphanumeric characters, underscores, and hyphens.`);
       throw new BadRequestException(
         `Profile name can only contain letters, numbers, underscores, and hyphens (no spaces)`
       );
     }
-    
-    this.logger.debug(`✅ STEP 1: Profile name validated`);
 
     // STEP 2: Check if profile already exists in database
     const existingProfile = await this.prisma.voucherProfile.findUnique({
@@ -55,11 +53,9 @@ export class VoucherService {
     });
 
     if (existingProfile) {
-      this.logger.warn(`❌ Profile already exists in database: "${createDto.name}"`);
+      this.logger.warn(`Profile already exists in database: "${createDto.name}"`);
       throw new BadRequestException(`Profile with name "${createDto.name}" already exists`);
     }
-    
-    this.logger.debug(`✅ STEP 2: No duplicate in database`);
 
     // STEP 3: Check Mikrotik connection (Graceful fallback if router offline)
     try {
@@ -70,7 +66,7 @@ export class VoucherService {
 
     // STEP 4: Try creating in Mikrotik (synchronous if online, queued if offline)
     if (this.mikrotikService.getConnectionStatus()) {
-      this.logger.log(`📝 STEP 4: Creating profile in Mikrotik...`);
+      this.logger.log(`Provisioning profile "${createDto.name}" in Mikrotik router`);
       try {
         const sessionTimeout = createDto.duration ? `${createDto.duration}m` : undefined;
         let rateLimit: string | undefined;
@@ -86,16 +82,16 @@ export class VoucherService {
         };
         
         await this.mikrotikService.createHotspotProfile(mikrotikData);
-        this.logger.log(`✅ Profile created in Mikrotik: ${createDto.name}`);
-      } catch (mikrotikError) {
-        this.logger.warn(`⚠️ Mikrotik profile sync warning: ${mikrotikError.message}`);
+        this.logger.log(`Profile created in Mikrotik: ${createDto.name}`);
+      } catch (mikrotikError: unknown) {
+        const msg = mikrotikError instanceof Error ? mikrotikError.message : String(mikrotikError);
+        this.logger.warn(`Mikrotik profile synchronization warning: ${msg}`);
       }
     } else {
-      this.logger.warn(`⚠️ Mikrotik offline - Profile ${createDto.name} created in DB only (sync later)`);
+      this.logger.warn(`Mikrotik is offline. Profile "${createDto.name}" created in database only.`);
     }
 
     // STEP 5: Create in database SECOND
-    this.logger.log(`📝 STEP 5: Creating profile in database...`);
     let profile;
     try {
       profile = await this.prisma.voucherProfile.create({
@@ -103,18 +99,17 @@ export class VoucherService {
       });
       
       // STEP 6: Refresh profile cache so the new profile is immediately available for edit
-      this.logger.log(`📝 STEP 6: Refreshing profile cache...`);
       await this.mikrotikService.refreshProfileCache();
       
-      this.logger.log(`✅ SUCCESS: Profile created in both Mikrotik and database: ${profile.name}`);
+      this.logger.log(`Profile successfully created: ${profile.name}`);
       return profile;
     } catch (dbError: unknown) {
-      this.logger.error(`❌ Database creation failed - cleaning up Mikrotik: ${getErrorMessage(dbError)}`);
+      this.logger.error(`Database profile creation failed: ${getErrorMessage(dbError)}`);
       try {
         await this.mikrotikService.deleteHotspotProfile(createDto.name);
-        this.logger.log(`🧹 Cleanup: Deleted profile from Mikrotik`);
+        this.logger.log(`Cleaned up orphaned profile from Mikrotik: ${createDto.name}`);
       } catch (cleanupError: unknown) {
-        this.logger.error(`⚠️ Cleanup failed: ${getErrorMessage(cleanupError)}`);
+        this.logger.error(`Cleanup failed: ${getErrorMessage(cleanupError)}`);
       }
       throw new InternalServerErrorException(
         `Failed to create profile in database: ${getErrorMessage(dbError)}`
@@ -129,7 +124,7 @@ export class VoucherService {
       await this.mikrotikService.checkConnection();
       
       if (!this.mikrotikService.getConnectionStatus()) {
-        this.logger.warn(`⚠️ Mikrotik not connected, profile "${profile.name}" not synced`);
+        this.logger.warn(`Mikrotik not connected. Profile "${profile.name}" not synchronized.`);
         return;
       }
 
@@ -149,9 +144,10 @@ export class VoucherService {
         rateLimit,
       });
       
-      this.logger.log(`✅ Profile "${profile.name}" synced to Mikrotik`);
-    } catch (error) {
-      this.logger.error(`❌ Failed to sync profile "${profile.name}" to Mikrotik: ${error.message}`);
+      this.logger.log(`Profile "${profile.name}" synchronized to Mikrotik router`);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.error(`Failed to synchronize profile "${profile.name}" to Mikrotik: ${message}`);
       // Don't throw - profile is saved in database, can retry sync later
     }
   }
@@ -169,7 +165,7 @@ export class VoucherService {
     let failed = 0;
     const errors: string[] = [];
 
-    this.logger.log(`🔄 Syncing ${profiles.length} profiles to Mikrotik...`);
+    this.logger.log(`Synchronizing ${profiles.length} voucher profiles to Mikrotik router`);
 
     for (const profile of profiles) {
       try {
@@ -180,17 +176,18 @@ export class VoucherService {
           await this.syncProfileToMikrotik(profile);
           synced++;
         } else {
-          this.logger.log(`✅ Profile "${profile.name}" already exists in Mikrotik`);
+          this.logger.log(`Profile "${profile.name}" already exists in Mikrotik router`);
           synced++;
         }
-      } catch (error) {
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : String(error);
         failed++;
-        errors.push(`${profile.name}: ${error.message}`);
-        this.logger.error(`❌ Failed to sync profile "${profile.name}": ${error.message}`);
+        errors.push(`${profile.name}: ${message}`);
+        this.logger.error(`Failed to synchronize profile "${profile.name}": ${message}`);
       }
     }
 
-    this.logger.log(`✅ Sync complete: ${synced} synced, ${failed} failed`);
+    this.logger.log(`Profile synchronization completed: ${synced} synchronized, ${failed} failed`);
     return { synced, failed, errors };
   }
 
@@ -224,11 +221,10 @@ export class VoucherService {
   }
 
   async updateProfile(id: string, updateDto: UpdateVoucherProfileDto) {
-    this.logger.log(`🚀 START: updateProfile(id="${id}")`);
+    this.logger.log(`Updating profile ID: ${id}`);
     
     // Get existing profile (need old name for Mikrotik update)
     const existing = await this.findProfile(id);
-    this.logger.debug(`✅ STEP 1: Found existing profile: "${existing.name}"`);
 
     // STEP 2: Check Mikrotik connection (Graceful fallback if offline)
     try {
@@ -239,7 +235,6 @@ export class VoucherService {
 
     // STEP 3: Update in Mikrotik if online
     if (this.mikrotikService.getConnectionStatus()) {
-      this.logger.log(`📝 STEP 3: Updating profile in Mikrotik...`);
       try {
         const sessionTimeout = updateDto.duration ? `${updateDto.duration}m` : undefined;
         let rateLimit: string | undefined;
@@ -252,36 +247,35 @@ export class VoucherService {
           sessionTimeout,
           rateLimit,
         });
-        this.logger.log(`✅ Profile "${existing.name}" updated in Mikrotik`);
+        this.logger.log(`Profile "${existing.name}" updated in Mikrotik`);
         
         if (updateDto.name && existing.name !== updateDto.name) {
-          this.logger.warn(`⚠️ Profile name change requested but not supported in Mikrotik. Keeping name as "${existing.name}"`);
+          this.logger.warn(`Profile name change requested but not supported in Mikrotik. Keeping name as "${existing.name}"`);
           delete updateDto.name;
         }
-      } catch (mikrotikError) {
-        this.logger.warn(`⚠️ Mikrotik profile update warning: ${mikrotikError.message}`);
+      } catch (mikrotikError: unknown) {
+        const msg = mikrotikError instanceof Error ? mikrotikError.message : String(mikrotikError);
+        this.logger.warn(`Mikrotik profile update warning: ${msg}`);
       }
     } else {
-      this.logger.warn(`⚠️ Mikrotik offline - Profile "${existing.name}" updated in DB only`);
+      this.logger.warn(`Mikrotik is offline. Profile "${existing.name}" updated in database only.`);
     }
 
     // STEP 4: Update in database SECOND
-    this.logger.log(`📝 STEP 4: Updating profile in database...`);
     const updated = await this.prisma.voucherProfile.update({
       where: { id },
       data: updateDto,
     });
 
     // STEP 5: Refresh profile cache to ensure consistency
-    this.logger.log(`📝 STEP 5: Refreshing profile cache...`);
     await this.mikrotikService.refreshProfileCache();
 
-    this.logger.log(`✅ SUCCESS: Profile updated in both Mikrotik and database: ${updated.name}`);
+    this.logger.log(`Profile updated successfully: ${updated.name}`);
     return updated;
   }
 
   async deleteProfile(id: string, forceDelete = false) {
-    this.logger.log(`🚀 START: deleteProfile(id="${id}", forceDelete=${forceDelete})`);
+    this.logger.log(`Deleting profile ID: ${id} (forceDelete: ${forceDelete})`);
     
     // STEP 1: Find profile - handle already deleted (idempotency)
     const profile = await this.prisma.voucherProfile.findUnique({
@@ -289,21 +283,17 @@ export class VoucherService {
     });
     
     if (!profile) {
-      this.logger.warn(`⚠️ Profile not found (may already be deleted): ${id}`);
+      this.logger.warn(`Profile ID not found or already deleted: ${id}`);
       return { message: `Profile already deleted or not found` };
     }
-    
-    this.logger.debug(`✅ STEP 1: Found profile: "${profile.name}"`);
 
     // Check if profile has vouchers
     const voucherCount = await this.prisma.voucher.count({
       where: { profileId: id },
     });
-    
-    this.logger.debug(`✅ STEP 2: Voucher count: ${voucherCount}`);
 
     if (voucherCount > 0 && !forceDelete) {
-      this.logger.warn(`❌ Cannot delete - ${voucherCount} vouchers exist`);
+      this.logger.warn(`Cannot delete profile "${profile.name}". ${voucherCount} vouchers are actively associated.`);
       throw new BadRequestException(
         `Cannot delete profile "${profile.name}": ${voucherCount} vouchers are using this profile. Use force delete to remove vouchers as well.`,
       );
@@ -312,15 +302,13 @@ export class VoucherService {
     // STEP 3: Check Mikrotik connection
     await this.mikrotikService.checkConnection();
     if (!this.mikrotikService.getConnectionStatus()) {
-      this.logger.error(`❌ Mikrotik not connected - cannot delete profile safely`);
+      this.logger.error(`Mikrotik is offline. Aborting safe profile deletion.`);
       throw new InternalServerErrorException('Mikrotik connection required for safe profile deletion');
     }
-    
-    this.logger.debug(`✅ STEP 3: Mikrotik connected`);
 
     // STEP 4: If force delete, delete vouchers from Mikrotik first (BATCH)
     if (voucherCount > 0 && forceDelete) {
-      this.logger.log(`📝 STEP 4: Force deleting ${voucherCount} vouchers (batch mode)...`);
+      this.logger.log(`Force deleting ${voucherCount} associated vouchers from router`);
       
       const vouchers = await this.prisma.voucher.findMany({
         where: { profileId: id },
@@ -330,42 +318,40 @@ export class VoucherService {
       // Use batch delete for better performance
       const usernames = vouchers.map(v => v.code);
       const result = await this.mikrotikService.removeHotspotUsersBatch(usernames);
-      this.logger.log(`✅ Batch deleted from Mikrotik: ${result.success} success, ${result.failed} failed`);
+      this.logger.log(`Batch deletion completed: ${result.success} succeeded, ${result.failed} failed`);
     }
 
     // STEP 5: Delete profile from Mikrotik FIRST (synchronous)
-    this.logger.log(`📝 STEP 5: Deleting profile from Mikrotik...`);
     try {
       await this.mikrotikService.deleteHotspotProfile(profile.name);
-      this.logger.log(`✅ Profile "${profile.name}" deleted from Mikrotik`);
-    } catch (mikrotikError) {
+      this.logger.log(`Profile "${profile.name}" deleted from Mikrotik router`);
+    } catch (mikrotikError: unknown) {
+      const msg = mikrotikError instanceof Error ? mikrotikError.message : String(mikrotikError);
       // If profile doesn't exist in Mikrotik, continue
-      if (mikrotikError.message?.includes('not found') || mikrotikError.message?.includes('no such')) {
-        this.logger.warn(`⚠️ Profile not found in Mikrotik (already deleted?)`);
+      if (msg.includes('not found') || msg.includes('no such')) {
+        this.logger.warn(`Profile "${profile.name}" was not found in Mikrotik router`);
       } else {
-        this.logger.error(`❌ FAILED: Mikrotik profile deletion - ${mikrotikError.message}`);
+        this.logger.error(`Failed to delete profile from Mikrotik: ${msg}`);
         throw new InternalServerErrorException(
-          `Failed to delete profile from Mikrotik: ${mikrotikError.message}`
+          `Failed to delete profile from Mikrotik: ${msg}`
         );
       }
     }
 
     // STEP 6: Delete vouchers from database (if force) - use transaction
     if (voucherCount > 0 && forceDelete) {
-      this.logger.log(`📝 STEP 6: Deleting ${voucherCount} vouchers from database...`);
       const deleteResult = await this.prisma.voucher.deleteMany({
         where: { profileId: id },
       });
-      this.logger.log(`✅ Deleted ${deleteResult.count} vouchers from database`);
+      this.logger.log(`Deleted ${deleteResult.count} vouchers from database`);
     }
 
     // STEP 7: Delete profile from database LAST - handle already deleted
-    this.logger.log(`📝 STEP 7: Deleting profile from database...`);
     try {
       await this.prisma.voucherProfile.delete({
         where: { id },
       });
-      this.logger.log(`✅ SUCCESS: Profile "${profile.name}" deleted from both Mikrotik and database`);
+      this.logger.log(`Profile "${profile.name}" deleted successfully from database`);
       return { message: `Profile "${profile.name}" deleted successfully` };
     } catch (prismaError: unknown) {
       const message = getErrorMessage(prismaError);
@@ -373,7 +359,7 @@ export class VoucherService {
         ? String((prismaError as { code?: string }).code)
         : '';
       if (code === 'P2025' || message.includes('not found')) {
-        this.logger.warn(`⚠️ Profile already deleted from database (concurrent request)`);
+        this.logger.warn(`Profile "${profile.name}" was already deleted from database`);
         return { message: `Profile "${profile.name}" deleted successfully` };
       }
       throw prismaError;
@@ -633,18 +619,17 @@ export class VoucherService {
           if (conflictUser && conflictUser.id !== user.id) {
             // MAC address conflict! Another user is using this MAC
             this.logger.warn(
-              `⚠️ MAC ${macAddress} conflict: currently used by ${conflictUser.phone}, ` +
-              `will be taken over by ${normalizedPhone}`
+              `MAC conflict detected: ${macAddress} is associated with ${conflictUser.phone}, transferring to ${normalizedPhone}`
             );
 
             // Strategy: Force override - kick the old user from this device
             // 1. Disconnect old user's active session in Mikrotik
             try {
               await this.mikrotikService.disconnectUserByMac(macAddress);
-              this.logger.log(`✅ Kicked old session from Mikrotik for MAC ${macAddress}`);
-            } catch (error) {
-              this.logger.warn(`⚠️ Failed to kick old session from Mikrotik: ${error.message}`);
-              // Continue anyway - clearing DB is still important
+              this.logger.log(`Disconnected previous session from Mikrotik for MAC ${macAddress}`);
+            } catch (error: unknown) {
+              const msg = error instanceof Error ? error.message : String(error);
+              this.logger.warn(`Failed to disconnect previous session from Mikrotik: ${msg}`);
             }
 
             // 2. Clear the MAC from the conflicting user (set to null)
@@ -655,16 +640,15 @@ export class VoucherService {
                 status: 'OFFLINE',
               },
             });
-            this.logger.log(`✅ Cleared MAC ${macAddress} from user ${conflictUser.phone}`);
+            this.logger.log(`Disassociated MAC ${macAddress} from user ${conflictUser.phone}`);
           }
 
           // Now safe to update current user's MAC
           updateData.macAddress = macAddress;
-        } catch (error) {
-          // If conflict resolution fails, log but don't crash
-          this.logger.error(`Failed to resolve MAC conflict: ${error.message}`);
-          // Skip MAC update if conflict resolution failed
-          this.logger.warn(`Skipping MAC update for safety`);
+        } catch (error: unknown) {
+          const msg = error instanceof Error ? error.message : String(error);
+          this.logger.error(`Failed to resolve MAC conflict: ${msg}`);
+          this.logger.warn(`Skipping MAC update due to conflict resolution failure`);
         }
       }
 
@@ -707,9 +691,10 @@ export class VoucherService {
         quota: profile.quota ? Number(profile.quota) : undefined,
         validityDays: profile.validityDays,
       });
-      this.logger.log(`Voucher ${code} sent to ${normalizedPhone} via WhatsApp`);
-    } catch (error) {
-      this.logger.error(`Failed to send voucher via WhatsApp: ${error.message}`);
+      this.logger.log(`Voucher ${code} sent to recipient ${normalizedPhone} via WhatsApp`);
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      this.logger.error(`Failed to send voucher via WhatsApp: ${msg}`);
       // Don't throw - voucher is still generated, just not sent via WA
     }
 
@@ -854,7 +839,7 @@ export class VoucherService {
         `✅ Added user ${voucher.code} to Mikrotik hotspot with profile: ${voucher.profile.name}`,
       );
     } catch (mikrotikError: unknown) {
-      this.logger.warn(`⚠️ Failed to add user to Mikrotik: ${getErrorMessage(mikrotikError)}`);
+      this.logger.warn(`Failed to add user to Mikrotik router: ${getErrorMessage(mikrotikError)}`);
     }
 
     // Log redemption
@@ -1009,11 +994,11 @@ export class VoucherService {
     }
 
     // 5. Create or update Mikrotik hotspot user with correct profile
-    this.logger.log(`🔄 Starting authentication for voucher ${voucher.code}, profile: ${voucher.profile.name}`);
+    this.logger.log(`Authenticating voucher: ${voucher.code}, profile: ${voucher.profile.name}`);
     
     try {
       // First, create/update the hotspot user with the correct profile
-      this.logger.log(`📝 Creating/updating hotspot user: ${voucher.code} with profile: ${voucher.profile.name}`);
+      this.logger.log(`Configuring hotspot user on router: ${voucher.code} (profile: ${voucher.profile.name})`);
       
       const userCreated = await this.mikrotikService.createOrUpdateHotspotUser(
         voucher.code,
@@ -1022,15 +1007,13 @@ export class VoucherService {
       );
 
       if (!userCreated) {
-        this.logger.error(`❌ Failed to create hotspot user: ${voucher.code}`);
+        this.logger.error(`Failed to configure hotspot user on router: ${voucher.code}`);
         throw new BadRequestException('Gagal membuat user di Mikrotik. Profile mungkin tidak sesuai.');
       }
 
-      this.logger.log(`✅ Hotspot user ready: ${voucher.code}`);
+      this.logger.log(`Hotspot user ready on router: ${voucher.code}`);
 
       // Authenticate - get login URL for browser redirect
-      this.logger.log(`🔐 Getting login URL for user ${voucher.code}`);
-      
       const authResult = await this.mikrotikService.authenticateUser(
         voucher.code,
         voucher.code,
@@ -1039,19 +1022,19 @@ export class VoucherService {
       );
 
       if (!authResult.success) {
-        this.logger.error(`❌ Authentication failed for user: ${voucher.code} - ${authResult.message}`);
+        this.logger.error(`Authentication rejected for user: ${voucher.code} (${authResult.message})`);
         throw new BadRequestException('Autentikasi gagal. Silakan coba lagi.');
       }
 
       this.logger.log(
-        `✅ User ready with voucher ${voucher.code}, profile: ${voucher.profile.name}`,
+        `User authenticated with voucher: ${voucher.code} (profile: ${voucher.profile.name})`,
       );
       
       // Store loginUrl for later use
       var loginUrl = authResult.loginUrl;
-    } catch (error) {
-      this.logger.error(`❌ Failed to create Mikrotik session: ${error.message}`);
-      this.logger.error(`Error stack: ${error.stack}`);
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      this.logger.error(`Failed to create Mikrotik session: ${msg}`);
       
       // Return user-friendly error messages
       if (error instanceof BadRequestException) {
@@ -1115,7 +1098,7 @@ export class VoucherService {
           where: { macAddress: normalizedMac },
           data: updateData,
         });
-        this.logger.log(`✅ Updated existing user record for MAC: ${normalizedMac}`);
+        this.logger.log(`Updated user record for MAC: ${normalizedMac}`);
       } else {
         // Create new user (guest — phone tidak tersedia di jalur authenticate)
         const phone = `guest-${Date.now()}`;
@@ -1140,7 +1123,7 @@ export class VoucherService {
             loginAt: now,
           },
         });
-        this.logger.log(`✅ Created new user record for MAC: ${normalizedMac}${name ? ` (${name})` : ''}`);
+        this.logger.log(`Created user record for MAC: ${normalizedMac}${name ? ` (${name})` : ''}`);
       }
 
       // Create session record
@@ -1154,9 +1137,10 @@ export class VoucherService {
           macAddress: normalizedMac,
         },
       });
-      this.logger.log(`✅ Created session record for MAC: ${normalizedMac}`);
-    } catch (error) {
-      this.logger.error(`⚠️ Failed to create/update user record: ${error.message}`);
+      this.logger.log(`Created session record for MAC: ${normalizedMac}`);
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      this.logger.error(`Failed to create or update user record: ${msg}`);
       // Don't fail the authentication, just log the error
     }
 
@@ -1196,7 +1180,7 @@ export class VoucherService {
    * Used by portal on load to detect existing connection
    */
   async checkActiveSession(mac: string) {
-    this.logger.log(`🔍 Checking active session for MAC: ${mac}`);
+    this.logger.log(`Checking active session for MAC: ${mac}`);
     
     // 1. Check Mikrotik for active session
     // Graceful saat router offline: portal harus tetap bisa dimuat
@@ -1204,7 +1188,7 @@ export class VoucherService {
     try {
       session = await this.mikrotikService.getActiveSessionByMac(mac);
     } catch (error: unknown) {
-      this.logger.warn(`⚠️ Mikrotik unreachable during session check: ${getErrorMessage(error)}`);
+      this.logger.warn(`Mikrotik unreachable during session check: ${getErrorMessage(error)}`);
       return {
         active: false,
         message: 'Mikrotik unreachable',
@@ -1212,18 +1196,14 @@ export class VoucherService {
     }
 
     if (!session) {
-      this.logger.log(`📋 No active session found in Mikrotik for MAC: ${mac}`);
+      this.logger.log(`No active session found in Mikrotik for MAC: ${mac}`);
       return {
         active: false,
         message: 'No active session',
       };
     }
 
-    this.logger.log(`✅ Active session found in Mikrotik:`, {
-      mac: session.mac,
-      username: session.username,
-      ip: session.ip,
-    });
+    this.logger.log(`Active session found in Mikrotik: ${session.mac} (${session.username})`);
 
     // 2. Get voucher info from database
     const voucher = await this.prisma.voucher.findFirst({
@@ -1236,9 +1216,9 @@ export class VoucherService {
     });
 
     if (voucher) {
-      this.logger.log(`📝 Voucher info found: ${voucher.code}, profile: ${voucher.profile.name}`);
+      this.logger.log(`Voucher record located: ${voucher.code} (profile: ${voucher.profile.name})`);
     } else {
-      this.logger.warn(`⚠️ No voucher found in DB for MAC: ${mac} (session exists in Mikrotik)`);
+      this.logger.warn(`No voucher record located in database for active MAC: ${mac}`);
     }
 
     return {
@@ -1272,9 +1252,10 @@ export class VoucherService {
     // 1. Disconnect from Mikrotik
     try {
       await this.mikrotikService.disconnectUserByMac(mac);
-      this.logger.log(`✅ Disconnected MAC: ${mac}`);
-    } catch (error) {
-      this.logger.error(`Failed to disconnect MAC ${mac} from Mikrotik: ${error.message}`);
+      this.logger.log(`Disconnected MAC from router: ${mac}`);
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      this.logger.error(`Failed to disconnect MAC ${mac} from Mikrotik: ${msg}`);
       // Continue anyway to log the disconnect attempt
     }
 

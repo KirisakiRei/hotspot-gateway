@@ -311,7 +311,7 @@ export class WaSessionClient {
       this.lastError = null;
       this.reconnectAttempts = 0;
       this.clearReconnectTimer();
-      this.nestLogger.log('Connected (paired)');
+      this.nestLogger.log('WhatsApp session established and paired');
       this.setState('CONNECTED');
       return;
     }
@@ -339,8 +339,8 @@ export class WaSessionClient {
       if (statusCode !== undefined && fatalReasons.includes(statusCode)) {
         this._paired = false;
         this.sentCount = 0;
-        this.lastError = `Session dihentikan: ${reason}`;
-        this.nestLogger.error(`Fatal disconnect, need re-pair: ${reason}`);
+        this.lastError = `Session terminated: ${reason}`;
+        this.nestLogger.error(`Permanent disconnect detected. Re-pairing required: ${reason}`);
         this.setClosureState();
         return;
       }

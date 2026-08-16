@@ -137,17 +137,17 @@ export class MikrotikConnectionManager implements OnModuleInit, OnModuleDestroy 
   // ==========================================
 
   async onModuleInit() {
-    this.logger.log('🔌 Checking initial Mikrotik connection...');
+    this.logger.log('Checking initial Mikrotik connection...');
     try {
       // Non-blocking quick check (3 detik) saat server start
       const connected = await this.connectWithTimeout(3000);
       if (connected) {
-        this.logger.log('✅ Initial Mikrotik connection successful');
+        this.logger.log('Initial Mikrotik connection established successfully');
       } else {
-        this.logger.warn('⚠️ Mikrotik not connected at startup - web portal will run in offline-safe mode');
+        this.logger.warn('Mikrotik is currently offline. Web portal will operate in offline-safe mode.');
       }
     } catch (error: unknown) {
-      this.logger.warn(`⚠️ Mikrotik offline at startup: ${getErrorMessage(error)} - web portal will run in offline-safe mode`);
+      this.logger.warn(`Mikrotik offline at startup (${getErrorMessage(error)}). Web portal will operate in offline-safe mode.`);
     }
   }
 
@@ -187,7 +187,7 @@ export class MikrotikConnectionManager implements OnModuleInit, OnModuleDestroy 
     try {
       const { host, port, username, password } = await this.getConnectionConfig();
 
-      this.logger.log(`🔌 Connecting to Mikrotik: ${host}:${port} as ${username}`);
+      this.logger.log(`Connecting to Mikrotik: ${host}:${port} as ${username}`);
 
       // Disconnect existing API first
       if (this.queryApi) {
@@ -233,7 +233,7 @@ export class MikrotikConnectionManager implements OnModuleInit, OnModuleDestroy 
       // Setup error handlers on the underlying RouterOSAPI
       if (this.queryClient && this.queryClient.on) {
         this.queryClient.on('error', (error: Error) => {
-          this.logger.error(`⚠️ RouterOS socket error: ${error.message} (errno: ${getRouterOsCode(error)})`);
+          this.logger.error(`RouterOS socket error: ${error.message} (errno: ${getRouterOsCode(error)})`);
           const code = getRouterOsCode(error);
           if (
             code === -4077 ||
@@ -243,17 +243,17 @@ export class MikrotikConnectionManager implements OnModuleInit, OnModuleDestroy 
             code === 'EPIPE'
           ) {
             this.isConnected = false;
-            this.logger.warn('🔌 Connection marked as disconnected due to socket error');
+            this.logger.warn('Connection marked as disconnected due to socket error');
           }
         });
 
         this.queryClient.on('close', () => {
-          this.logger.warn('🔌 RouterOS connection closed');
+          this.logger.warn('RouterOS connection closed');
           this.isConnected = false;
         });
 
         this.queryClient.on('timeout', () => {
-          this.logger.warn('⏱️ RouterOS connection timeout');
+          this.logger.warn('RouterOS connection timeout');
           this.isConnected = false;
         });
       }
@@ -262,7 +262,7 @@ export class MikrotikConnectionManager implements OnModuleInit, OnModuleDestroy 
       this.connectionRetries = 0; // Reset retries on success
       this.lastActivity = Date.now();
 
-      this.logger.log(`✅ Connected to Mikrotik at ${host}:${port}`);
+      this.logger.log(`Connected to Mikrotik at ${host}:${port}`);
 
       // Start keep-alive if not already running
       if (!this.keepAliveInterval) {
@@ -271,7 +271,7 @@ export class MikrotikConnectionManager implements OnModuleInit, OnModuleDestroy 
 
       return true;
     } catch (error: unknown) {
-      this.logger.error(`❌ Failed to connect to Mikrotik: ${getErrorMessage(error)}`);
+      this.logger.error(`Failed to connect to Mikrotik: ${getErrorMessage(error)}`);
       this.isConnected = false;
       this.queryApi = null;
       this.queryClient = null;
@@ -279,7 +279,7 @@ export class MikrotikConnectionManager implements OnModuleInit, OnModuleDestroy 
       // Retry logic: max 1 retry with fast backoff
       if (this.connectionRetries < 1) {
         this.connectionRetries++;
-        this.logger.log(`🔄 Retrying connection (${this.connectionRetries}/1)...`);
+        this.logger.log(`Retrying Mikrotik connection (${this.connectionRetries}/1)...`);
         await new Promise((resolve) => setTimeout(resolve, 1000));
         this.connectionLock = false; // Release lock for retry
         return this.connect();
@@ -303,7 +303,7 @@ export class MikrotikConnectionManager implements OnModuleInit, OnModuleDestroy 
     try {
       const { host, port, username, password } = await this.getConnectionConfig();
 
-      this.logger.log(`📡 Connecting stream client to Mikrotik: ${host}:${port}`);
+      this.logger.log(`Connecting stream client to Mikrotik: ${host}:${port}`);
 
       // Close existing stream API if any
       if (this.streamApi) {
@@ -346,7 +346,7 @@ export class MikrotikConnectionManager implements OnModuleInit, OnModuleDestroy 
       // Setup error handlers
       if (this.streamClient && this.streamClient.on) {
         this.streamClient.on('error', (error: Error) => {
-          this.logger.error(`⚠️ Stream RouterOS socket error: ${error.message} (errno: ${getRouterOsCode(error)})`);
+          this.logger.error(`Stream RouterOS socket error: ${error.message} (errno: ${getRouterOsCode(error)})`);
           const code = getRouterOsCode(error);
           if (
             code === -4077 ||
@@ -356,27 +356,27 @@ export class MikrotikConnectionManager implements OnModuleInit, OnModuleDestroy 
             code === 'EPIPE'
           ) {
             this.isStreamConnected = false;
-            this.logger.warn('🔌 Stream connection marked as disconnected due to socket error');
+            this.logger.warn('Stream connection marked as disconnected due to socket error');
           }
         });
 
         this.streamClient.on('close', () => {
-          this.logger.warn('🔌 Stream RouterOS connection closed');
+          this.logger.warn('Stream RouterOS connection closed');
           this.isStreamConnected = false;
         });
 
         this.streamClient.on('timeout', () => {
-          this.logger.warn('⏱️ Stream RouterOS connection timeout');
+          this.logger.warn('Stream RouterOS connection timeout');
           this.isStreamConnected = false;
         });
       }
 
       this.isStreamConnected = true;
-      this.logger.log('📡 ✅ Stream client connected successfully');
+      this.logger.log('Stream client connected successfully');
 
       return true;
     } catch (error: unknown) {
-      this.logger.error(`📡 ❌ Failed to connect stream client: ${getErrorMessage(error)}`);
+      this.logger.error(`Failed to connect stream client: ${getErrorMessage(error)}`);
       this.isStreamConnected = false;
       this.streamApi = null;
       this.streamClient = null;
@@ -398,7 +398,7 @@ export class MikrotikConnectionManager implements OnModuleInit, OnModuleDestroy 
       this.streamClient = null;
       this.streamMenu = null;
       this.isStreamConnected = false;
-      this.logger.log('🔌 Stream client disconnected');
+      this.logger.log('Stream client disconnected');
     }
 
     // Disconnect query API
@@ -412,7 +412,7 @@ export class MikrotikConnectionManager implements OnModuleInit, OnModuleDestroy 
       this.queryClient = null;
       this.queryMenu = null;
       this.isConnected = false;
-      this.logger.log('🔌 Query client disconnected');
+      this.logger.log('Query client disconnected');
     }
   }
 
@@ -509,7 +509,7 @@ export class MikrotikConnectionManager implements OnModuleInit, OnModuleDestroy 
       const message = getErrorMessage(error);
       const code = getRouterOsCode(error);
       if (message === 'TIMEOUT' || message.includes('timeout')) {
-        this.logger.warn(`⏱️ Timeout on ${command} (${timeoutMs}ms)`);
+        this.logger.warn(`Timeout executing command ${command} (${timeoutMs}ms)`);
         return defaultValue;
       }
 
@@ -582,12 +582,12 @@ export class MikrotikConnectionManager implements OnModuleInit, OnModuleDestroy 
 
     if (!this.isConnected || !this.queryClient) {
       if (this.lastActivity > 0) {
-        this.logger.log('🔄 Reconnecting to Mikrotik...');
+        this.logger.log('Reconnecting to Mikrotik router...');
       }
       this.connectionRetries = 0;
       const connected = await this.connect();
       if (!connected) {
-        this.logger.warn('⚠️ Mikrotik unreachable, proceeding with offline-safe fallback');
+        this.logger.warn('Mikrotik router is unreachable. Proceeding with offline-safe fallback.');
         throw new Error('Mikrotik router is unreachable');
       }
     }
@@ -614,7 +614,7 @@ export class MikrotikConnectionManager implements OnModuleInit, OnModuleDestroy 
     }
 
     const commandStr = commandArray.join(' ');
-    this.logger.debug(`📤 RAW: ${commandStr}`);
+    this.logger.debug(`RAW command dispatch: ${commandStr}`);
     const startTime = Date.now();
 
     try {
@@ -622,20 +622,20 @@ export class MikrotikConnectionManager implements OnModuleInit, OnModuleDestroy 
       const duration = Date.now() - startTime;
 
       if (Array.isArray(result)) {
-        this.logger.debug(`📥 RAW Result (${duration}ms): ${result.length} items`);
+        this.logger.debug(`RAW response (${duration}ms): ${result.length} items`);
       } else {
-        this.logger.debug(`📥 RAW Result (${duration}ms): ${JSON.stringify(result).substring(0, 100)}`);
+        this.logger.debug(`RAW response (${duration}ms): ${JSON.stringify(result).substring(0, 100)}`);
       }
 
       return result || [];
     } catch (error: unknown) {
       const duration = Date.now() - startTime;
       if (getRouterOsCode(error) === 'UNKNOWNREPLY') {
-        this.logger.debug(`📥 RAW Empty (${duration}ms) on ${commandStr}: No items found`);
+        this.logger.debug(`RAW empty response (${duration}ms) on ${commandStr}: No items found`);
         return [];
       }
 
-      this.logger.error(`📥 RAW Error (${duration}ms) on ${commandStr}: ${getErrorMessage(error)}`);
+      this.logger.error(`RAW error response (${duration}ms) on ${commandStr}: ${getErrorMessage(error)}`);
       return [];
     }
   }
@@ -650,7 +650,7 @@ export class MikrotikConnectionManager implements OnModuleInit, OnModuleDestroy 
     try {
       const connector = (this.queryClient as unknown as RouterOsClientInternals).connector;
       if (!connector || !connector.socket || !connector.receiver) {
-        this.logger.warn('⚠️ Could not access connector internals for !empty patch');
+        this.logger.warn('Could not access connector internals for socket patching');
         return;
       }
 
@@ -659,7 +659,7 @@ export class MikrotikConnectionManager implements OnModuleInit, OnModuleDestroy 
 
       const originalListeners = socket.listeners('data');
       if (originalListeners.length === 0) {
-        this.logger.warn('⚠️ No socket data listeners found for patching');
+        this.logger.warn('No socket data listeners found for patching');
         return;
       }
 
@@ -672,7 +672,7 @@ export class MikrotikConnectionManager implements OnModuleInit, OnModuleDestroy 
         const idx = data.indexOf(emptyMarker);
 
         if (idx !== -1) {
-          this.logger.debug('📭 Intercepted !empty in socket data');
+          this.logger.debug('Intercepted !empty in socket data stream');
 
           const sentenceStart = idx - 1; // length byte
 
@@ -689,15 +689,15 @@ export class MikrotikConnectionManager implements OnModuleInit, OnModuleDestroy 
           const after = data.slice(sentenceEnd);
           data = Buffer.concat([before, after]);
 
-          this.logger.debug(`📭 Removed !empty sentence, ${sentenceEnd - sentenceStart} bytes stripped`);
+          this.logger.debug(`Removed !empty sentence, ${sentenceEnd - sentenceStart} bytes stripped`);
         }
 
         originalHandler.call(receiver, data);
       });
 
-      this.logger.debug('✅ Patched socket for !empty handling');
+      this.logger.debug('Socket stream patched for empty response handling');
     } catch (error) {
-      this.logger.warn('⚠️ Could not patch socket for !empty handling:', error);
+      this.logger.warn('Failed to patch socket for empty response handling:', error);
     }
   }
 
@@ -723,13 +723,13 @@ export class MikrotikConnectionManager implements OnModuleInit, OnModuleDestroy 
             getRouterOsCode(error) !== 'UNKNOWNREPLY' &&
             !getErrorMessage(error).includes('!empty')
           ) {
-            this.logger.warn('Keep-alive failed, will reconnect on next operation');
+            this.logger.warn('Keep-alive ping failed. Reconnection will occur on next operation.');
             this.isConnected = false;
           }
         }
       }
     }, 45000); // 45 detik
-    this.logger.log('🔄 Keep-alive started (45s interval)');
+    this.logger.log('Mikrotik keep-alive heartbeat started (45s interval)');
   }
 
   private stopKeepAlive() {

@@ -26,7 +26,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     
     // Only connect to Redis if REDIS_HOST is explicitly configured and not empty
     if (!redisHost || redisHost.trim() === '' || redisHost === 'disabled' || redisHost === 'false') {
-      this.logger.log('📦 Redis not configured - running in local mode (no pub/sub)');
+      this.logger.log('Redis is disabled. Operating in local in-memory pub/sub mode.');
       this.useRedis = false;
       return;
     }
@@ -45,7 +45,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
       const port = parseInt(this.configService.get('REDIS_PORT') || '6379', 10);
       const password = this.configService.get('REDIS_PASSWORD') || undefined;
 
-      this.logger.log(`🔌 Connecting to Redis at ${host}:${port}...`);
+      this.logger.log(`Connecting to Redis server at ${host}:${port}`);
 
       // Create publisher connection
       this.publisher = new Redis({
@@ -55,7 +55,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
         maxRetriesPerRequest: 3,
         retryStrategy: (times) => {
           if (times > 3) {
-            this.logger.error('Redis connection failed after 3 retries');
+            this.logger.error('Redis connection attempt limit exceeded (3 retries)');
             return null;
           }
           return Math.min(times * 200, 2000);
@@ -94,18 +94,18 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
           const callbacks = this.subscriptions.get(channel) || [];
           callbacks.forEach(cb => cb(data));
         } catch (error) {
-          this.logger.error(`Error parsing Redis message: ${error}`);
+          this.logger.error(`Failed to parse Redis message payload: ${error}`);
         }
       });
 
       // Test connection
       await this.publisher.ping();
       this.isConnected = true;
-      this.logger.log('✅ Redis connected successfully');
+      this.logger.log('Redis client connected successfully');
       
       return true;
     } catch (error: unknown) {
-      this.logger.error(`❌ Failed to connect to Redis: ${getErrorMessage(error)}`);
+      this.logger.error(`Failed to establish Redis connection: ${getErrorMessage(error)}`);
       this.isConnected = false;
       this.useRedis = false;
       return false;
@@ -122,7 +122,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
       this.subscriber = null;
     }
     this.isConnected = false;
-    this.logger.log('🔌 Redis disconnected');
+    this.logger.log('Redis connection closed');
   }
 
   /**

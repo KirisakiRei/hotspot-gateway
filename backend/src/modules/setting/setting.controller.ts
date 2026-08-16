@@ -36,12 +36,12 @@ export class SettingController {
   @Get('voucher/generate-settings')
   @Roles('SUPER_ADMIN', 'ADMIN')
   async getVoucherGenerateSettings() {
-    this.logger.debug('🔍 GET voucher/generate-settings called');
+    this.logger.debug('Retrieving voucher generation settings');
     
     const settings = await this.settingService.findByKey('voucher_generate_settings');
     
     if (!settings) {
-      this.logger.debug('No settings found, returning defaults');
+      this.logger.debug('No voucher generation settings found. Returning defaults.');
       return {
         success: true,
         data: {
@@ -55,13 +55,13 @@ export class SettingController {
 
     try {
       const parsed = JSON.parse(settings.value);
-      this.logger.debug('Settings found:', parsed);
+      this.logger.debug('Voucher generation settings retrieved successfully');
       return {
         success: true,
         data: parsed,
       };
     } catch (error) {
-      this.logger.error('Failed to parse settings:', error);
+      this.logger.error('Failed to parse voucher generation settings JSON:', error);
       return {
         success: true,
         data: {
@@ -79,7 +79,7 @@ export class SettingController {
   async updateVoucherGenerateSettings(
     @Body() settings: { profileId?: string; prefix?: string; length?: number; format?: string },
   ) {
-    this.logger.log('📝 PUT voucher/generate-settings called with:', settings);
+    this.logger.log('Updating voucher generation settings');
     
     try {
       const value = JSON.stringify({
@@ -91,14 +91,15 @@ export class SettingController {
 
       await this.settingService.update('voucher_generate_settings', value, 'voucher');
 
-      this.logger.log('✅ Voucher generate settings updated successfully');
+      this.logger.log('Voucher generation settings updated successfully');
 
       return {
         success: true,
         message: 'Voucher generate settings updated',
       };
-    } catch (error) {
-      this.logger.error('❌ Failed to update voucher generate settings:', error.message);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.error(`Failed to update voucher generation settings: ${message}`);
       throw error;
     }
   }
@@ -165,7 +166,7 @@ export class SettingController {
         config.password,
       );
 
-      this.logger.log('✅ Mikrotik connection test successful');
+      this.logger.log('Mikrotik connection test successful');
 
       return {
         success: true,
@@ -174,7 +175,7 @@ export class SettingController {
       };
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
-      this.logger.error(`❌ Mikrotik connection test failed: ${message}`);
+      this.logger.error(`Mikrotik connection test failed: ${message}`);
       
       return {
         success: false,

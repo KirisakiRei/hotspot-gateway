@@ -84,7 +84,7 @@ async function bootstrap() {
   // Add request logging middleware for debugging routes
   app.use((req: Request, _res: Response, next: NextFunction) => {
     if (req.url.includes('generate-settings')) {
-      logger.debug(`📥 ${req.method} ${req.url}`);
+      logger.debug(`HTTP ${req.method} ${req.url}`);
     }
     next();
   });
@@ -122,7 +122,7 @@ async function bootstrap() {
       if (isAllowed) {
         callback(null, true);
       } else {
-        logger.warn(`⚠️ CORS blocked origin: ${origin}`);
+        logger.warn(`CORS rejected origin: ${origin}`);
         callback(new Error('Not allowed by CORS'));
       }
     },
@@ -145,9 +145,9 @@ async function bootstrap() {
   const port = configService.get('PORT') || 3001;
   await app.listen(port);
   
-  console.log(`🚀 Backend server running on: http://localhost:${port}/api`);
-  console.log(`📝 Environment: ${configService.get('NODE_ENV')}`);
-  console.log(`🗄️  Database: MySQL (${configService.get('DATABASE_URL')?.split('@')[1]?.split('/')[0]})`);
+  logger.log(`Server listening at http://localhost:${port}/api`);
+  logger.log(`Runtime environment: ${configService.get('NODE_ENV')}`);
+  logger.log(`Database connected: MySQL (${configService.get('DATABASE_URL')?.split('@')[1]?.split('/')[0]})`);
 }
 
 bootstrap();

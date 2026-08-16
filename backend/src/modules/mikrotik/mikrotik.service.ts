@@ -1208,10 +1208,10 @@ export class MikrotikService {
             const safeErrors = ['SOCKTMOUT', 'ECONNRESET', 'ETIMEDOUT', 'UNKNOWNREPLY'];
             
             if ((typeof errorCode === 'string' && safeErrors.includes(errorCode)) || err.message.includes('Timed out')) {
-              this.logger.warn(`📡 Stream ${tag} connection error (will auto-reconnect): ${err.message}`);
+              this.logger.warn(`Stream ${tag} connection error (will auto-reconnect): ${err.message}`);
               this.conn.invalidateStream();
             } else {
-              this.logger.error(` Stream ${tag} error: ${err.message}`);
+              this.logger.error(`Stream ${tag} error: ${err.message}`);
             }
             
             this.streamEmitter.emit(`stream:error:${tag}`, { 
@@ -1252,10 +1252,10 @@ export class MikrotikService {
           onData({ ...data, _eventType: eventType });
         }
 
-        this.logger.debug(` Stream ${tag} [${eventType}]: ${JSON.stringify(data).substring(0, 200)}`);
+        this.logger.debug(`Stream ${tag} [${eventType}]: ${JSON.stringify(data).substring(0, 200)}`);
         
         } catch (callbackError: unknown) {
-          this.logger.error(` Stream ${tag} callback error: ${getErrorMessage(callbackError)}`);
+          this.logger.error(`Stream ${tag} callback error: ${getErrorMessage(callbackError)}`);
           this.streamEmitter.emit(`stream:error:${tag}`, { 
             tag, 
             error: getErrorMessage(callbackError),
@@ -1266,7 +1266,7 @@ export class MikrotikService {
       // Store the stream object for later cancellation
       streamInfo.stream = stream;
 
-      this.logger.log(`  LISTEN stream ${tag} started successfully (zero polling!)`);
+      this.logger.log(`LISTEN stream ${tag} started successfully`);
       return true;
     } catch (error: unknown) {
       this.logger.error(`Failed to start listen stream ${tag}: ${getErrorMessage(error)}`);

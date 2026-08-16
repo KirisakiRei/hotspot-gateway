@@ -100,7 +100,7 @@ export class UserService {
     try {
       // If not provided, fetch from Mikrotik (for standalone calls)
       const sessions = activeSessions ?? await this.mikrotikService.getActiveSessions();
-      this.logger.log(`📊 Syncing ${sessions.length} active sessions from Mikrotik`);
+      this.logger.log(`Synchronizing ${sessions.length} active sessions from Mikrotik`);
 
       // Get all MAC addresses from active sessions
       const activeMacs = sessions
@@ -134,7 +134,7 @@ export class UserService {
         });
       }
     } catch (error) {
-      this.logger.error(`❌ Failed to sync Mikrotik status: ${getErrorMessage(error)}`);
+      this.logger.error(`Failed to synchronize Mikrotik status: ${getErrorMessage(error)}`);
     }
   }
 
@@ -181,7 +181,7 @@ export class UserService {
         };
       });
     } catch (error) {
-      this.logger.error(`❌ Failed to enrich users: ${getErrorMessage(error)}`);
+      this.logger.error(`Failed to enrich users with session data: ${getErrorMessage(error)}`);
       return users;
     }
   }
@@ -241,7 +241,7 @@ export class UserService {
     try {
       // Get active sessions directly from Mikrotik (source of truth)
       const activeSessions = await this.mikrotikService.getActiveSessions();
-      this.logger.log(`📊 Found ${activeSessions.length} active sessions in Mikrotik`);
+      this.logger.log(`Found ${activeSessions.length} active sessions in Mikrotik`);
 
       // Get MAC addresses
       const macAddresses = activeSessions
@@ -275,8 +275,9 @@ export class UserService {
 
       // Enrich with live Mikrotik data (reuse the activeSessions we already have)
       return this.enrichUsersWithMikrotikData(users, activeSessions);
-    } catch (error) {
-      this.logger.error('❌ Failed to fetch online users from Mikrotik:', error.message);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.error(`Failed to fetch online users from Mikrotik: ${message}`);
       return [];
     }
   }
@@ -304,7 +305,7 @@ export class UserService {
         const username = session.user || session.username;
         if (username) {
           await this.mikrotikService.disconnectUser(username);
-          this.logger.log(`✅ Kicked user ${username} (MAC: ${user.macAddress})`);
+          this.logger.log(`Disconnected user ${username} (MAC: ${user.macAddress})`);
         }
       }
 
@@ -329,8 +330,9 @@ export class UserService {
       });
 
       return { message: 'User disconnected successfully' };
-    } catch (error) {
-      this.logger.error(`❌ Failed to kick user: ${error.message}`);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.error(`Failed to disconnect user: ${message}`);
       throw error;
     }
   }
