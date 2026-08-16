@@ -1,0 +1,17 @@
+# /etc/wireguard/wg0.conf di VPS
+# Generate key: wg genkey | tee privatekey | wg pubkey > publickey
+
+[Interface]
+Address = 10.8.0.1/24
+ListenPort = 51820
+PrivateKey = VPS_PRIVATE_KEY
+# Persist across reboot
+SaveConfig = false
+PostUp = iptables -A FORWARD -i wg0 -j ACCEPT; iptables -A FORWARD -o wg0 -j ACCEPT
+PostDown = iptables -D FORWARD -i wg0 -j ACCEPT; iptables -D FORWARD -o wg0 -j ACCEPT
+
+# Peer: MikroTik
+[Peer]
+PublicKey = MIKROTIK_PUBLIC_KEY
+AllowedIPs = 10.8.0.2/32
+PersistentKeepalive = 25

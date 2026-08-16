@@ -621,6 +621,7 @@ export class VoucherService {
           ipAddress,
           status: 'OFFLINE',
           loginAt: new Date(),
+          voucher: { connect: { id: voucher.id } },
         },
       });
     } else {
@@ -686,6 +687,8 @@ export class VoucherService {
       if (normalizedPhone !== user.phone) {
         updateData.phone = normalizedPhone;
       }
+
+      updateData.voucher = { connect: { id: voucher.id } };
 
       try {
         user = await this.prisma.user.update({
@@ -1296,6 +1299,50 @@ export class VoucherService {
     return {
       success: true,
       message: 'Disconnected successfully',
+    };
+  }
+
+  /**
+   * Resume portal after iOS CNA closes (user opened WhatsApp).
+   * Looks up the latest unused voucher bound to this MAC.
+   */
+  async getPendingVoucher(mac: string) {
+    const normalizedMac = mac.trim();
+    if (!normalizedMac) {
+      return { pending: false as const };
+    }
+
+    const user = await this.prisma.user.findFirst({
+      where: { macAddress: normalizedMac },
+      orderBy: { updatedAt: 'desc' },
+    });
+
+    if (!user?.voucherId) {
+      return { pending: false as const };
+    }
+
+    const voucher = await this.prisma.voucher.findFirst({
+      where: {
+        id: user.voucherId,
+        status: { in: [VoucherStatus.UNUSED, VoucherStatus.ACTIVE] },
+        OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+      },
+      include: { profile: true },
+    });
+
+    if (!voucher) {
+      return { pending: false as const };
+    }
+
+    return {
+      pending: true as const,
+      phone: user.phone,
+      voucher: {
+        id: voucher.id,
+        codeLength: voucher.code.length,
+        profileName: voucher.profile.name,
+        expiresAt: voucher.expiresAt,
+      },
     };
   }
 

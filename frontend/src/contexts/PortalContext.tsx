@@ -28,6 +28,47 @@ interface PortalState {
   checkingSession: boolean;
 }
 
+interface PortalProgress {
+  mac: string;
+  phoneNumber: string;
+  email: string;
+  agreedToTerms: boolean;
+  step: PortalStep;
+  updatedAt: number;
+}
+
+const PORTAL_PROGRESS_KEY = 'portal_progress';
+const PROGRESS_TTL_MS = 2 * 60 * 60 * 1000;
+
+const readProgress = (mac: string): PortalProgress | null => {
+  try {
+    const raw = localStorage.getItem(PORTAL_PROGRESS_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as PortalProgress;
+    if (!parsed.mac || parsed.mac !== mac) return null;
+    if (Date.now() - parsed.updatedAt > PROGRESS_TTL_MS) return null;
+    if (parsed.step !== 'form' && parsed.step !== 'voucher') return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+};
+
+const writeProgress = (progress: Omit<PortalProgress, 'updatedAt'>) => {
+  try {
+    localStorage.setItem(PORTAL_PROGRESS_KEY, JSON.stringify({
+      ...progress,
+      updatedAt: Date.now(),
+    }));
+  } catch {
+    // Safari private / CNA storage may reject writes
+  }
+};
+
+const clearProgress = () => {
+  localStorage.removeItem(PORTAL_PROGRESS_KEY);
+};
+
 interface PortalContextType {
   state: PortalState;
   setStep: (step: PortalStep) => void;
@@ -207,25 +248,74 @@ export function PortalProvider({ children }: { children: ReactNode }) {
             return; // Don't load advertisement for connected users
           } else {
             console.log('📋 No active session found:', data);
-            console.log('📋 Will show portal flow with advertisement');
           }
         } catch (error) {
           console.error('❌ Session check failed:', error);
+        }
+
+        const saved = readProgress(mac);
+        if (saved) {
+          setState((prev) => ({
+            ...prev,
+            currentStep: saved.step,
+            phoneNumber: saved.phoneNumber,
+            email: saved.email,
+            agreedToTerms: saved.agreedToTerms,
+            checkingSession: false,
+          }));
+          if (saved.step === 'video') {
+            loadAdvertisement();
+          }
+          return;
+        }
+
+        try {
+          const pendingRes = await voucherApi.getPending({ mac });
+          const pending = pendingRes.data.data;
+          if (pendingRes.data.success && pending?.pending) {
+            setState((prev) => ({
+              ...prev,
+              currentStep: 'voucher',
+              phoneNumber: pending.phone || prev.phoneNumber,
+              checkingSession: false,
+            }));
+            return;
+          }
+        } catch (error) {
+          console.log('Pending voucher check skipped:', error);
         }
       } else {
         console.log('⚠️ No MAC address found, cannot check session');
       }
       
-      // Case 3: No session - show normal portal flow with advertisement
       console.log('📺 Loading advertisement for new user...');
       setState(prev => ({ ...prev, checkingSession: false }));
       loadAdvertisement();
     };
 
     initializePortal();
-  }, []); // Run once on mount
+  }, []);
 
-  // REMOVED: Duplicate loadAdvertisement useEffect - it was causing race condition
+  useEffect(() => {
+    const mac = state.deviceInfo.mac;
+    if (!mac || state.checkingSession) return;
+    if (state.currentStep === 'form' || state.currentStep === 'voucher') {
+      writeProgress({
+        mac,
+        phoneNumber: state.phoneNumber,
+        email: state.email,
+        agreedToTerms: state.agreedToTerms,
+        step: state.currentStep,
+      });
+    }
+  }, [
+    state.currentStep,
+    state.phoneNumber,
+    state.email,
+    state.agreedToTerms,
+    state.deviceInfo.mac,
+    state.checkingSession,
+  ]);
 
   const setStep = (step: PortalStep) => {
     setState(prev => ({ ...prev, currentStep: step }));
@@ -316,10 +406,15 @@ export function PortalProvider({ children }: { children: ReactNode }) {
         setState(prev => ({ 
           ...prev, 
           voucher: response.data.data!.voucher,
-          // Don't auto-fill voucher code - let user input manually from WhatsApp
-          // voucherCode: response.data.data!.voucher.code,
           loading: false 
         }));
+        writeProgress({
+          mac: state.deviceInfo.mac,
+          phoneNumber: state.phoneNumber,
+          email: state.email,
+          agreedToTerms: state.agreedToTerms,
+          step: 'voucher',
+        });
 
         toast({
           title: 'Success',
@@ -560,8 +655,8 @@ export function PortalProvider({ children }: { children: ReactNode }) {
       });
 
       if (response.data.success) {
-        // Clear session cache
         localStorage.removeItem('portal_session_cache');
+        clearProgress();
         
         setState(prev => ({ 
           ...prev, 
@@ -589,13 +684,13 @@ export function PortalProvider({ children }: { children: ReactNode }) {
   };
 
   const resetPortal = () => {
-    // Clear session cache on reset
     localStorage.removeItem('portal_session_cache');
-    
+    clearProgress();
+
     setState({
       ...initialState,
-      checkingSession: false, // Don't check session on reset
-      deviceInfo: state.deviceInfo, // Keep device info
+      checkingSession: false,
+      deviceInfo: state.deviceInfo,
     });
     loadAdvertisement();
   };

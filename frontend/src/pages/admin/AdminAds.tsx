@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Plus, Edit, Trash2, Eye, Clock, Loader2, Youtube, Upload, Film, ToggleLeft, ToggleRight, X, Video, AlertCircle, Check } from 'lucide-react';
+import { Plus, Edit, Trash2, Eye, Clock, Loader2, Upload, Film, ToggleLeft, ToggleRight, X, Video, AlertCircle, Check } from 'lucide-react';
 import { AdminSidebar } from '@/components/admin/AdminSidebar';
 import { AdminHeader } from '@/components/admin/AdminHeader';
 import { Badge } from '@/components/admin/AdminComponents';
@@ -8,7 +8,7 @@ import { advertisementApi, type Advertisement } from '@/services/api';
 import { getErrorMessage } from '@/lib/error';
 
 type ModalType = 'add' | 'edit' | 'delete' | null;
-type VideoType = 'YOUTUBE' | 'LOCAL';
+type VideoType = 'LOCAL';
 
 export default function AdminAds() {
   const [ads, setAds] = useState<Advertisement[]>([]);
@@ -51,18 +51,6 @@ export default function AdminAds() {
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const extractYouTubeId = (url: string): string | null => {
-    const patterns = [
-      /(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\s]+)/,
-      /youtube\.com\/embed\/([^?&\s]+)/,
-    ];
-    for (const pattern of patterns) {
-      const match = url.match(pattern);
-      if (match) return match[1];
-    }
-    return null;
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -140,30 +128,18 @@ export default function AdminAds() {
       return;
     }
 
-    if (videoType === 'YOUTUBE') {
-      if (!formData.videoUrl) {
-        toast.error('URL YouTube harus diisi');
-        return;
-      }
-      const youtubeId = extractYouTubeId(formData.videoUrl);
-      if (!youtubeId) {
-        toast.error('URL YouTube tidak valid');
-        return;
-      }
-    } else {
-      if (!uploadedVideoUrl && !editingAd?.videoUrl) {
-        toast.error('Upload video terlebih dahulu');
-        return;
-      }
+    if (!uploadedVideoUrl && !editingAd?.videoUrl) {
+      toast.error('Upload video terlebih dahulu');
+      return;
     }
     
     setIsSaving(true);
     try {
       const dataToSend = {
         ...formData,
-        videoType,
-        videoUrl: videoType === 'LOCAL' ? (uploadedVideoUrl || editingAd?.videoUrl) : formData.videoUrl,
-        thumbnailUrl: videoType === 'YOUTUBE' ? undefined : null, // No thumbnail for local videos
+        videoType: 'LOCAL' as const,
+        videoUrl: uploadedVideoUrl || editingAd?.videoUrl,
+        thumbnailUrl: null,
       };
 
       if (editingAd) {
@@ -233,14 +209,13 @@ export default function AdminAds() {
 
   const openEditModal = (ad: Advertisement) => {
     setEditingAd(ad);
-    const adVideoType = (ad.videoType as VideoType) || 'YOUTUBE';
-    setVideoType(adVideoType);
-    setUploadedVideoUrl(adVideoType === 'LOCAL' ? ad.videoUrl : '');
+    setVideoType('LOCAL');
+    setUploadedVideoUrl(ad.videoUrl.startsWith('/videos/') ? ad.videoUrl : '');
     setVideoDuration(ad.duration);
     setFormData({
       title: ad.title,
       videoUrl: ad.videoUrl,
-      videoType: adVideoType,
+      videoType: 'LOCAL',
       duration: ad.duration,
       displayDuration: ad.displayDuration,
       startTime: ad.startTime,
@@ -266,12 +241,7 @@ export default function AdminAds() {
     setVideoDuration(0);
   };
 
-  const getVideoPreviewUrl = () => {
-    if (videoType === 'LOCAL') {
-      return uploadedVideoUrl || editingAd?.videoUrl || '';
-    }
-    return '';
-  };
+  const getVideoPreviewUrl = () => uploadedVideoUrl || editingAd?.videoUrl || '';
 
   // Get view counts - use both field names for compatibility
   const getViews = (ad: Advertisement) => ad.views || ad.viewCount || 0;
@@ -380,11 +350,13 @@ export default function AdminAds() {
                       <tr key={ad.id} className="border-b border-border hover:bg-secondary/50 transition-colors">
                         {/* Preview */}
                         <td className="p-3">
-                          {ad.videoType === 'YOUTUBE' && ad.youtubeId ? (
-                            <img 
-                              src={ad.thumbnailUrl || `https://img.youtube.com/vi/${ad.youtubeId}/mqdefault.jpg`} 
-                              alt={ad.title} 
-                              className="w-20 h-12 object-cover rounded-lg" 
+                          {ad.videoUrl?.startsWith('/videos/') ? (
+                            <video
+                              src={ad.videoUrl}
+                              className="w-20 h-12 object-cover rounded-lg bg-black"
+                              muted
+                              playsInline
+                              preload="metadata"
                             />
                           ) : (
                             <div className="w-20 h-12 bg-secondary rounded-lg flex items-center justify-center">
@@ -398,17 +370,10 @@ export default function AdminAds() {
                         </td>
                         {/* Type */}
                         <td className="p-3">
-                          {ad.videoType === 'YOUTUBE' ? (
-                            <Badge variant="destructive" className="flex items-center gap-1 w-fit">
-                              <Youtube className="w-3 h-3" />
-                              YouTube
-                            </Badge>
-                          ) : (
-                            <Badge variant="default" className="flex items-center gap-1 w-fit">
-                              <Upload className="w-3 h-3" />
-                              Lokal
-                            </Badge>
-                          )}
+                          <Badge variant="default" className="flex items-center gap-1 w-fit">
+                            <Upload className="w-3 h-3" />
+                            Lokal
+                          </Badge>
                         </td>
                         {/* Duration */}
                         <td className="p-3">
@@ -498,37 +463,8 @@ export default function AdminAds() {
             </div>
 
             <form onSubmit={handleSubmit} className="p-6 space-y-6">
-              {/* Video Type Selection */}
-              <div>
-                <label className="block text-sm font-medium mb-3">Tipe Video</label>
-                <div className="grid grid-cols-2 gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setVideoType('LOCAL')}
-                    className={`p-4 rounded-xl border-2 transition-all ${
-                      videoType === 'LOCAL'
-                        ? 'border-primary bg-primary/5'
-                        : 'border-border hover:border-primary/50'
-                    }`}
-                  >
-                    <Upload className={`w-6 h-6 mx-auto mb-2 ${videoType === 'LOCAL' ? 'text-primary' : 'text-muted-foreground'}`} />
-                    <p className={`font-medium ${videoType === 'LOCAL' ? 'text-primary' : ''}`}>Upload Video</p>
-                    <p className="text-xs text-muted-foreground mt-1">MP4, WebM, OGG (maks 100MB)</p>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setVideoType('YOUTUBE')}
-                    className={`p-4 rounded-xl border-2 transition-all ${
-                      videoType === 'YOUTUBE'
-                        ? 'border-red-500 bg-red-500/5'
-                        : 'border-border hover:border-red-500/50'
-                    }`}
-                  >
-                    <Youtube className={`w-6 h-6 mx-auto mb-2 ${videoType === 'YOUTUBE' ? 'text-red-500' : 'text-muted-foreground'}`} />
-                    <p className={`font-medium ${videoType === 'YOUTUBE' ? 'text-red-500' : ''}`}>YouTube</p>
-                    <p className="text-xs text-muted-foreground mt-1">Paste URL YouTube</p>
-                  </button>
-                </div>
+              <div className="rounded-xl border border-border bg-secondary/40 px-4 py-3 text-sm text-muted-foreground">
+                Video diputar dari server (VPS). YouTube dinonaktifkan agar perangkat tidak mendeteksi internet sebelum login.
               </div>
 
               {/* Title */}
@@ -544,9 +480,7 @@ export default function AdminAds() {
                 />
               </div>
 
-              {/* Video Input based on type */}
-              {videoType === 'LOCAL' ? (
-                <div>
+              <div>
                   <label className="block text-sm font-medium mb-2">Upload Video *</label>
                   <input
                     ref={fileInputRef}
@@ -612,33 +546,6 @@ export default function AdminAds() {
                     </div>
                   )}
                 </div>
-              ) : (
-                <div>
-                  <label className="block text-sm font-medium mb-2">URL YouTube *</label>
-                  <input
-                    type="url"
-                    value={formData.videoUrl}
-                    onChange={(e) => setFormData({ ...formData, videoUrl: e.target.value })}
-                    className="w-full px-4 py-2.5 border border-border rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent bg-background"
-                    placeholder="https://www.youtube.com/watch?v=..."
-                    required={videoType === 'YOUTUBE'}
-                  />
-                  <p className="text-xs text-muted-foreground mt-1.5">
-                    Thumbnail akan otomatis diambil dari YouTube
-                  </p>
-                  
-                  {/* YouTube Preview */}
-                  {formData.videoUrl && extractYouTubeId(formData.videoUrl) && (
-                    <div className="mt-3 rounded-xl overflow-hidden">
-                      <img 
-                        src={`https://img.youtube.com/vi/${extractYouTubeId(formData.videoUrl)}/mqdefault.jpg`}
-                        alt="YouTube Thumbnail"
-                        className="w-full h-48 object-cover"
-                      />
-                    </div>
-                  )}
-                </div>
-              )}
 
               {/* Duration Settings */}
               <div className="p-4 bg-secondary/50 rounded-xl space-y-4">
@@ -777,7 +684,7 @@ export default function AdminAds() {
               <div className="bg-secondary rounded-xl p-4 mb-4">
                 <p className="font-medium">{editingAd.title}</p>
                 <p className="text-sm text-muted-foreground">
-                  {editingAd.videoType === 'YOUTUBE' ? `YouTube: ${editingAd.youtubeId}` : 'Video Lokal'}
+                  Video lokal
                 </p>
               </div>
 

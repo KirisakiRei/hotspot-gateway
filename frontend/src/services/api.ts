@@ -266,6 +266,11 @@ export const voucherApi = {
   // Phase 3: Authentication endpoints - use SLOW for Mikrotik operations
   authenticate: (data: AuthenticateVoucherRequest) => api.post<ApiResponse<{ session: SessionInfo; message: string; loginUrl?: string }>>('/vouchers/authenticate', data, { timeout: TIMEOUTS.SLOW, skipAuthRedirect: true }),
   checkSession: (params: CheckSessionRequest) => api.get<ApiResponse<SessionInfo | null>>('/vouchers/check-session', { params, skipAuthRedirect: true }),
+  getPending: (params: { mac: string }) => api.get<ApiResponse<{
+    pending: boolean;
+    phone?: string;
+    voucher?: { id: string; codeLength: number; profileName: string; expiresAt?: string | null };
+  }>>('/vouchers/pending', { params, skipAuthRedirect: true }),
   disconnect: (data: DisconnectRequest) => api.post<ApiResponse<{ message: string }>>('/vouchers/disconnect', data, { skipAuthRedirect: true }),
 
   // Admin endpoints

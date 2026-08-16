@@ -232,7 +232,7 @@ export class WhatsappService implements OnModuleInit {
   ): Promise<boolean> {
     const [portalRaw, envPortal] = await Promise.all([
       this.getSetting('portal_url'),
-      Promise.resolve(this.configService.get<string>('FRONTEND_URL') || 'http://10.10.10.2'),
+      Promise.resolve(this.configService.get<string>('FRONTEND_URL') || 'https://wifi.rekavia.com'),
     ]);
 
     const message = buildVoucherMessage({

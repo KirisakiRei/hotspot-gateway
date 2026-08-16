@@ -27,8 +27,7 @@ import { Roles } from '@/common/decorators/roles.decorator';
 import { ApiResponseDto } from '@/common/dto/api-response.dto';
 import { AdminRole } from '@prisma/client';
 
-// Ensure upload directory exists
-const uploadDir = join(process.cwd(), '..', 'frontend', 'public', 'videos');
+const uploadDir = join(process.cwd(), 'public', 'videos');
 if (!existsSync(uploadDir)) {
   mkdirSync(uploadDir, { recursive: true });
 }

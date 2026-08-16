@@ -219,47 +219,7 @@ async function main() {
   // ==========================================
   console.log('🎬 Creating advertisements...');
 
-  const ad1 = await prisma.advertisement.create({
-    data: {
-      title: 'Welcome to Free WiFi',
-      description: 'Enjoy fast and free internet access',
-      videoType: 'YOUTUBE',
-      videoUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
-      youtubeId: 'dQw4w9WgXcQ',
-      thumbnailUrl: 'https://img.youtube.com/vi/dQw4w9WgXcQ/maxresdefault.jpg',
-      duration: 30,
-      startTime: 0,
-      endTime: 30,
-      displayDuration: 30,
-      skipable: true,
-      skipAfter: 5,
-      priority: 10,
-      weight: 5,
-      isActive: true,
-    },
-  });
-
-  const ad2 = await prisma.advertisement.create({
-    data: {
-      title: 'Product Showcase',
-      description: 'Check out our latest products',
-      videoType: 'YOUTUBE',
-      videoUrl: 'https://www.youtube.com/watch?v=9bZkp7q19f0',
-      youtubeId: '9bZkp7q19f0',
-      thumbnailUrl: 'https://img.youtube.com/vi/9bZkp7q19f0/maxresdefault.jpg',
-      duration: 45,
-      startTime: 0,
-      endTime: 20,
-      displayDuration: 20,
-      skipable: false,
-      skipAfter: 0,
-      priority: 5,
-      weight: 3,
-      isActive: false,
-    },
-  });
-
-  console.log(`✅ Created ${2} advertisements\n`);
+  console.log('ℹ️  Iklan YouTube tidak di-seed. Upload video lokal lewat Admin → Iklan.\n');
 
   // ==========================================
   // 7. CREATE SETTINGS
@@ -322,7 +282,7 @@ async function main() {
     // Portal Settings
     {
       key: 'portal_url',
-      value: 'http://10.10.10.2',
+      value: 'https://wifi.rekavia.com',
       type: SettingType.STRING,
       group: 'portal',
       description: 'Base URL portal (tanpa /portal) untuk template pesan WhatsApp',
@@ -383,7 +343,7 @@ async function main() {
   console.log(`   - Vouchers: ${totalVouchers}`);
   console.log(`   - Users: ${users.length}`);
   console.log(`   - Sessions: 3`);
-  console.log(`   - Advertisements: 2`);
+      console.log(`   - Advertisements: 0 (upload video lokal di Admin)`);
   console.log(`   - Settings: ${settings.length}`);
   console.log(`   - System Logs: 20\n`);
 

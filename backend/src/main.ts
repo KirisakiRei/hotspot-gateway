@@ -75,11 +75,11 @@ async function bootstrap() {
   // Global prefix
   app.setGlobalPrefix('api');
 
-  // Serve static video files from public/videos
-  app.useStaticAssets(join(__dirname, '..', 'public'), {
+  const videoDir = join(process.cwd(), 'public', 'videos');
+  app.useStaticAssets(videoDir, {
     prefix: '/videos/',
   });
-  logger.log('📹 Static video files served from /videos endpoint');
+  logger.log(`Static videos served from ${videoDir} at /videos/`);
 
   // Add request logging middleware for debugging routes
   app.use((req: Request, _res: Response, next: NextFunction) => {
@@ -98,21 +98,25 @@ async function bootstrap() {
       }
 
       // List of allowed origins
+      const extraOrigins = (configService.get<string>('CORS_ORIGINS') || '')
+        .split(',')
+        .map((value) => value.trim())
+        .filter(Boolean);
+
       const allowedOrigins = [
         configService.get('FRONTEND_URL') || 'http://localhost:5173',
         'http://localhost:5173',
         'http://localhost:5174',
         'http://localhost:8080',
-        'http://10.10.10.2:5173', // Laptop IP
-        'http://10.10.10.2:5174',
         'http://127.0.0.1:5173',
+        'https://wifi.rekavia.com',
+        'http://wifi.rekavia.com',
+        ...extraOrigins,
       ];
 
-      // Check if origin matches any allowed pattern (exact match, bukan startsWith)
-      const isAllowed = allowedOrigins.some(allowed => origin === allowed) ||
-        // Allow any origin from 192.168.10.x network (hotspot clients)
+      const isAllowed = allowedOrigins.some((allowed) => origin === allowed) ||
+        /^https?:\/\/([a-z0-9-]+\.)*rekavia\.com(?::\d+)?$/i.test(origin) ||
         /^http:\/\/192\.168\.10\.\d{1,3}(:\d+)?$/.test(origin) ||
-        // Allow any origin from 10.10.10.x network (management network)
         /^http:\/\/10\.10\.10\.\d{1,3}(:\d+)?$/.test(origin);
 
       if (isAllowed) {

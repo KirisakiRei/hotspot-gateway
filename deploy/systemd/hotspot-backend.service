@@ -1,0 +1,23 @@
+[Unit]
+Description=Hotspot Gateway API (NestJS + Baileys)
+After=network.target mysql.service
+Wants=mysql.service
+
+[Service]
+Type=simple
+User=hotspot
+Group=hotspot
+WorkingDirectory=/opt/hotspot-gateway/backend
+Environment=NODE_ENV=production
+EnvironmentFile=/opt/hotspot-gateway/backend/.env
+ExecStart=/usr/local/bin/bun dist/src/main.js
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=20
+LimitNOFILE=65535
+
+# Satu proses saja — Baileys tidak cluster-safe
+Nice=0
+
+[Install]
+WantedBy=multi-user.target

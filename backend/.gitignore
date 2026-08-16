@@ -12,6 +12,9 @@ dist/
 build/
 
 # Runtime & local-only
-public/
+public/*
+!public/videos/
+public/videos/*
+!public/videos/.gitkeep
 scripts/
 wa-auth/

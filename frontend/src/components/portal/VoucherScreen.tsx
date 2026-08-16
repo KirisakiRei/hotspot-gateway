@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { AlertCircle, MessageCircle, Check, Loader2 } from 'lucide-react';
 import { usePortal } from '@/contexts/PortalContext';
 import { PortalHeader } from './PortalHeader';
+import { IosResumeHint } from './IosResumeHint';
 
 const CODE_LENGTH = 6;
 const RESEND_COOLDOWN = 59;
@@ -125,6 +126,10 @@ export function VoucherScreen() {
           <p className="text-sm text-muted-foreground text-center">
             Masukkan kode {CODE_LENGTH} digit untuk mengaktifkan internet
           </p>
+        </div>
+
+        <div className="mb-4">
+          <IosResumeHint context="voucher" />
         </div>
 
         {/* Code Input */}

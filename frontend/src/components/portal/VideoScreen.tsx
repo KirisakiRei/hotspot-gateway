@@ -11,8 +11,6 @@ export function VideoScreen() {
   const [isMuted, setIsMuted] = useState(true);
   const [countdown, setCountdown] = useState(0);
   const [progress, setProgress] = useState(0);
-  const [iframeError, setIframeError] = useState(false);
-  const [iframeLoaded, setIframeLoaded] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const hasTrackedView = useRef(false);
@@ -131,33 +129,7 @@ export function VideoScreen() {
     }
   };
 
-  // Get YouTube embed URL
-  const getVideoUrl = () => {
-    if (!advertisement) return '';
-    
-    if (advertisement.videoType === 'YOUTUBE' && advertisement.youtubeId) {
-      const startTime = advertisement.startTime || 0;
-      const endTime = advertisement.endTime || advertisement.duration;
-      
-      // Simplified parameters to avoid Error 153
-      const params = new URLSearchParams({
-        autoplay: '1',
-        mute: '1',
-        controls: '0',
-        rel: '0',
-        modestbranding: '1',
-        playsinline: '1',
-      });
-      
-      if (startTime > 0) params.append('start', startTime.toString());
-      if (endTime > 0) params.append('end', endTime.toString());
-      
-      // Use regular YouTube (not nocookie) for better compatibility
-      return `https://www.youtube.com/embed/${advertisement.youtubeId}?${params.toString()}`;
-    }
-    
-    return advertisement.videoUrl;
-  };
+  const getVideoUrl = () => advertisement?.videoUrl || '';
 
   // Handle skip when no ad or error - go directly to form
   const handleSkipNoAd = () => {
@@ -210,89 +182,10 @@ export function VideoScreen() {
     );
   }
 
-  const isYoutube = advertisement.videoType === 'YOUTUBE';
-
   return (
     <div className="fixed inset-0 bg-black flex flex-col animate-fade-in">
-      {/* Full Screen Video */}
       <div className="flex-1 relative overflow-hidden">
-        {isYoutube ? (
-          // YouTube iframe with overlay to prevent clicks
-          <>
-            {/* Show loading until iframe loads */}
-            {!iframeLoaded && !iframeError && (
-              <div className="absolute inset-0 flex items-center justify-center bg-black z-20">
-                <Loader2 className="w-12 h-12 text-primary animate-spin" />
-                <p className="text-white/60 text-sm mt-4">Memuat video...</p>
-              </div>
-            )}
-            
-            {/* Show error state with retry option */}
-            {iframeError && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-gray-900 to-black z-20 p-6">
-                <AlertCircle className="w-12 h-12 text-yellow-500 mb-4" />
-                <p className="text-white text-center mb-2 font-semibold">Video tidak dapat dimuat</p>
-                <p className="text-white/60 text-sm text-center mb-6">
-                  Mungkin video privat atau tidak tersedia di region Anda
-                </p>
-                <div className="space-y-3 w-full max-w-xs">
-                  <button
-                    onClick={() => {
-                      setIframeError(false);
-                      setIframeLoaded(false);
-                      // Force reload iframe
-                      const iframe = document.querySelector('iframe');
-                      if (iframe) {
-                        iframe.src = iframe.src;
-                      }
-                    }}
-                    className="w-full px-4 py-3 bg-white/20 text-white rounded-xl hover:bg-white/30 flex items-center justify-center gap-2 font-medium"
-                  >
-                    <RefreshCw className="w-4 h-4" />
-                    Coba Lagi
-                  </button>
-                  <button
-                    onClick={handleSkipNoAd}
-                    className="w-full px-4 py-3 bg-primary text-primary-foreground rounded-xl hover:opacity-90 font-semibold"
-                  >
-                    Lanjutkan Tanpa Video
-                  </button>
-                </div>
-              </div>
-            )}
-            
-            <iframe
-              key={`yt-${advertisement.youtubeId}-${Date.now()}`}
-              src={getVideoUrl()}
-              title="Advertisement Video"
-              className={`absolute inset-0 w-full h-full border-0 ${iframeError ? 'hidden' : ''}`}
-              allow="autoplay; encrypted-media; picture-in-picture"
-              referrerPolicy="no-referrer-when-downgrade"
-              loading="eager"
-              style={{ pointerEvents: 'none' }}
-              onLoad={() => {
-                console.log('✅ YouTube iframe loaded successfully');
-                setIframeLoaded(true);
-                setIsPlaying(true);
-                // View tracking moved to handleNext - counted when user clicks "Lanjutkan"
-              }}
-              onError={(e) => {
-                console.error('❌ YouTube iframe failed to load:', e);
-                setIframeError(true);
-                setIsPlaying(true);
-              }}
-            />
-            {/* Transparent overlay to block all clicks on YouTube video */}
-            <div 
-              className="absolute inset-0 z-10" 
-              style={{ backgroundColor: 'transparent', pointerEvents: 'auto' }}
-              onClick={(e) => e.preventDefault()}
-              onContextMenu={(e) => e.preventDefault()}
-            />
-          </>
-        ) : (
-          // Regular video with controls disabled
-          <>
+        <>
             <video
               ref={videoRef}
               className="absolute inset-0 w-full h-full object-cover pointer-events-none"
@@ -307,17 +200,14 @@ export function VideoScreen() {
               onLoadedData={(e) => {
                 const video = e.currentTarget;
                 video.play().then(() => {
-                  console.log('✅ Local video started playing');
                   setIsPlaying(true);
-                  // View tracking moved to handleNext - counted when user clicks "Lanjutkan"
-                }).catch(err => {
-                  console.error('❌ Local video autoplay failed:', err);
+                }).catch(() => {
+                  setIsPlaying(false);
                 });
               }}
             >
-              <source src={advertisement.videoUrl} type="video/mp4" />
+              <source src={getVideoUrl()} type="video/mp4" />
             </video>
-            {/* Transparent overlay to block all clicks on video */}
             {isPlaying && (
               <div 
                 className="absolute inset-0 z-10" 
@@ -326,23 +216,19 @@ export function VideoScreen() {
                 onContextMenu={(e) => e.preventDefault()}
               />
             )}
+            {!isPlaying && (
+              <button
+                onClick={handlePlay}
+                className="absolute inset-0 flex items-center justify-center bg-black/40 transition-opacity z-20"
+              >
+                <div className="w-20 h-20 rounded-full bg-primary flex items-center justify-center shadow-2xl">
+                  <Play className="w-9 h-9 text-primary-foreground ml-1" fill="currentColor" />
+                </div>
+              </button>
+            )}
           </>
-        )}
 
-        {/* Play Button Overlay removed for LOCAL videos (autoplay) - only for YouTube */}
-        {isYoutube && !isPlaying && (
-          <button
-            onClick={handlePlay}
-            className="absolute inset-0 flex items-center justify-center bg-black/40 transition-opacity z-20"
-          >
-            <div className="w-20 h-20 rounded-full bg-primary flex items-center justify-center shadow-2xl">
-              <Play className="w-9 h-9 text-primary-foreground ml-1" fill="currentColor" />
-            </div>
-          </button>
-        )}
-
-        {/* Controls Overlay - Top */}
-        {(isPlaying || isYoutube) && (
+        {isPlaying && (
           <>
             {/* Countdown Badge */}
             {countdown > 0 && isSkipable && (

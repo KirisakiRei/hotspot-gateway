@@ -28,21 +28,15 @@ export class AdvertisementService {
   ) {}
 
   async create(createDto: CreateAdvertisementDto) {
-    // Extract YouTube ID if URL provided
-    let youtubeId: string | undefined;
-
-    if (createDto.videoType === 'YOUTUBE' && createDto.videoUrl) {
-      youtubeId = this.youtubeService.extractYoutubeId(createDto.videoUrl) || undefined;
-      if (!youtubeId) {
-        throw new BadRequestException('Invalid YouTube URL');
-      }
-
-      // Auto-generate thumbnail if not provided
-      if (!createDto.thumbnailUrl) {
-        createDto.thumbnailUrl =
-          this.youtubeService.getThumbnailUrl(youtubeId);
-      }
+    if (createDto.videoType !== 'LOCAL') {
+      throw new BadRequestException('Hanya video lokal yang didukung. Upload file ke server.');
     }
+
+    if (!createDto.videoUrl.startsWith('/videos/')) {
+      throw new BadRequestException('videoUrl harus hasil upload lokal (/videos/...)');
+    }
+
+    let youtubeId: string | undefined;
 
     // Calculate display duration
     const startTime = createDto.startTime ?? 0;
@@ -107,14 +101,15 @@ export class AdvertisementService {
     const current = await this.findOne(id); // Check if exists
 
     // Update YouTube ID if URL changed
+    if (updateDto.videoType && updateDto.videoType !== 'LOCAL') {
+      throw new BadRequestException('Hanya video lokal yang didukung.');
+    }
+
     let youtubeId = current.youtubeId;
     const videoUrl = updateDto.videoUrl;
-    
-    if (videoUrl) {
-      const extractedId = this.youtubeService.extractYoutubeId(videoUrl);
-      if (extractedId) {
-        youtubeId = extractedId;
-      }
+
+    if (videoUrl && !videoUrl.startsWith('/videos/')) {
+      throw new BadRequestException('videoUrl harus hasil upload lokal (/videos/...)');
     }
 
     // Recalculate display duration if needed
@@ -163,6 +158,7 @@ export class AdvertisementService {
     const activeAds = await this.prisma.advertisement.findMany({
       where: {
         isActive: true,
+        videoType: VideoType.LOCAL,
         OR: [
           { startDate: null, endDate: null },
           { startDate: { lte: now }, endDate: { gte: now } },

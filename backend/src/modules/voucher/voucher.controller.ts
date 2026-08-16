@@ -161,6 +161,20 @@ export class VoucherController {
     );
   }
 
+  @Get('pending')
+  @Public()
+  async getPendingVoucher(@Query('mac') mac: string) {
+    if (!mac) {
+      throw new BadRequestException('MAC address is required');
+    }
+
+    const result = await this.voucherService.getPendingVoucher(mac);
+    return ApiResponseDto.success(
+      result.pending ? 'Pending voucher found' : 'No pending voucher',
+      result,
+    );
+  }
+
   @Get(':id')
   @UseGuards(JwtAuthGuard)
   async findVoucher(@Param('id') id: string) {

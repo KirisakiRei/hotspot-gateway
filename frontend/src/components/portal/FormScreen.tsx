@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Check, AlertCircle, X, Loader2 } from 'lucide-react';
 import { usePortal } from '@/contexts/PortalContext';
 import { PortalHeader } from './PortalHeader';
+import { IosResumeHint } from './IosResumeHint';
 
 export function FormScreen() {
   const { state, setPhoneNumber, setEmail, setAgreedToTerms, requestVoucher } = usePortal();
@@ -81,10 +82,12 @@ export function FormScreen() {
             <h1 className="text-xl font-semibold text-foreground text-center mb-1">
               Lengkapi Data Anda
             </h1>
-            <p className="text-sm text-muted-foreground text-center">
-              Kami akan mengirim voucher ke WhatsApp Anda
-            </p>
-          </div>
+              <p className="text-sm text-muted-foreground text-center">
+                Kami akan mengirim voucher ke WhatsApp Anda
+              </p>
+            </div>
+
+            <IosResumeHint context="form" />
 
           <div className="space-y-4">
             {/* Phone Number Field */}

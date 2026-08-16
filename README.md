@@ -111,7 +111,21 @@ Kredensial router disimpan terenkripsi di database (`ENCRYPTION_KEY`). Contoh sk
 - `mikrotik-pages/`
 - `login.html`
 
-Pastikan IP server aplikasi masuk walled-garden agar portal dan API bisa diakses sebelum login hotspot.
+Pastikan hostname portal (`wifi.rekavia.com`) dan WhatsApp masuk walled-garden. Video iklan diputar dari VPS — jangan buka YouTube di walled garden.
+
+## Produksi (VPS)
+
+Panduan lengkap (Nginx, systemd, WireGuard, MikroTik, SSL):
+
+- [`deploy/README.md`](deploy/README.md)
+
+Ringkas:
+
+1. DNS `wifi.rekavia.com` → IP VPS
+2. Build backend (`bun dist/src/main.js`) + frontend (`VITE_API_URL=https://wifi.rekavia.com/api`)
+3. Nginx satu origin: `/` SPA, `/api` + `/videos` + `/socket.io` ke Nest
+4. WireGuard VPS `10.8.0.1` ↔ MikroTik `10.8.0.2`; API `8728` hanya dari tunnel
+5. Upload `login.html` ke folder hotspot router
 
 ## Struktur repositori
 
