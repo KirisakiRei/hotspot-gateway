@@ -1,10 +1,10 @@
 // ==========================================
 // WHATSAPP GATEWAY - Template Pool
-// Struktur pesan (sesuai kebutuhan bisnis):
+// Struktur pesan:
 //   [Salam] -> [Header + Kode OTP/Voucher] -> [Cara Menggunakan]
-//   -> [Masa Berlaku] -> [Konfirmasi "balas *ya*"]
+//   -> [Masa Berlaku] -> [Pemberitahuan Pesan Otomatis]
 // Variasi tone (formal, casual, gen-z, santai) agar
-// tidak terdeteksi sebagai pesan spam identik.
+// tidak terdeteksi sebagai spam identik.
 // ==========================================
 
 export interface VoucherTemplatePayload {
@@ -23,7 +23,7 @@ const validity = (p: VoucherTemplatePayload) => `${p.validityDays} hari`;
 const templates: TemplateFn[] = [
   // ========== FORMAL ==========
   (p) => `
-Halo, terima kasih telah menggunakan layanan kami.
+Halo, terima kasih telah menggunakan layanan WiFi Hotspot kami.
 
 *Kode Hotspot WiFi*
 ━━━━━━━━━━━━━━━━━━━
@@ -38,12 +38,12 @@ Durasi: ${p.durationText}
 
 Voucher ini hanya dapat digunakan sekali dan berlaku ${validity(p)}.
 
-Apabila pesan ini Anda terima, silakan balas *ya* sebagai konfirmasi.
+_Pesan ini dikirim otomatis oleh sistem. Mohon tidak membalas pesan ini._
 `.trim(),
 
   // ========== CASUAL ==========
   (p) => `
-Hai! Ada kabar baik nih 🎉
+Hai! Voucher internet kamu sudah siap.
 
 *Kode Hotspot WiFi*
 Kode Voucher: *${p.code}*
@@ -52,34 +52,34 @@ Durasi: ${p.durationText}
 *Cara pakai:*
 1. Buka ${portal(p)}
 2. Masukkan kode voucher di halaman login
-3. Langsung online, deh!
+3. Langsung online dan nikmati internetnya!
 
 Voucher ini sekali pakai dan berlaku ${validity(p)}.
 
-Kalau pesannya sampai, balas *ya* ya!
+_Pesan otomatis dari Hotspot Gateway._
 `.trim(),
 
   // ========== GEN-Z ==========
   (p) => `
-halooww 👋 voucher kamu udah siap!
+Halo! Voucher kamu udah siap nih.
 
 *Kode Hotspot WiFi*
 Kode: *${p.code}*
 Durasi: ${p.durationText}
 
-step by step:
-1. buka ${portal(p)}
-2. input kode di halaman login
-3. gaskeun internetan 🚀
+Step by step:
+1. Buka ${portal(p)}
+2. Masukkan kode di halaman login
+3. Selamat internetan!
 
-voucher sekali pakai, berlaku ${validity(p)} aja.
+Voucher sekali pakai, berlaku ${validity(p)}.
 
-btw, kalau ini kamu, reply *ya* dong! 😎
+_Pesan ini dikirim otomatis oleh sistem._
 `.trim(),
 
   // ========== SANTAI ==========
   (p) => `
-Assalamualaikum / Selamat pagi 🌤️
+Selamat datang di layanan Hotspot WiFi kami.
 
 *Kode Hotspot WiFi*
 Kode Voucher: *${p.code}*
@@ -88,11 +88,11 @@ Durasi: ${p.durationText}
 *Cara menggunakan:*
 1. Buka website ${portal(p)}
 2. Masukkan kode voucher di halaman login
-3. Nikmati internet gratis!
+3. Nikmati akses internet cepat dan stabil!
 
 Voucher ini hanya dapat digunakan sekali dan berlaku ${validity(p)}.
 
-Balas *ya* jika kamu menerima pesan ini
+_Pesan otomatis sistem. Tidak perlu dibalas._
 `.trim(),
 ];
 
