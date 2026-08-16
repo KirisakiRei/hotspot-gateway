@@ -536,7 +536,7 @@ export function PortalProvider({ children }: { children: ReactNode }) {
 
         toast({
           title: 'Menghubungkan...',
-          description: 'Mengarahkan ke halaman masuk',
+          description: 'Mengarahkan ke halaman login',
         });
 
         // IMPORTANT: Redirect to Mikrotik login URL for actual session creation
@@ -659,8 +659,8 @@ export function PortalProvider({ children }: { children: ReactNode }) {
         }));
 
         toast({
-          title: 'Terputus',
-          description: response.data.data?.message || 'Koneksi internet telah diputus',
+          title: 'Disconnected',
+          description: response.data.data?.message || 'Anda sudah disconnect dari internet',
         });
 
         // Reset to video screen

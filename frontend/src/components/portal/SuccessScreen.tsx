@@ -43,7 +43,7 @@ export function SuccessScreen() {
           onClick={handleBrowse}
           className="btn-primary w-full"
         >
-          Mulai Menjelajah
+          Mulai Browsing
         </button>
       </div>
     </div>

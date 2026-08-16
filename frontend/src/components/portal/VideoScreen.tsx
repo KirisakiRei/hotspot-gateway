@@ -234,7 +234,7 @@ export function VideoScreen() {
             {countdown > 0 && isSkipable && (
               <div className="absolute top-6 right-6 px-4 py-2 rounded-full bg-black/60 backdrop-blur-sm z-20">
                 <span className="text-base font-medium text-white">
-                  Lewati dalam {countdown} detik
+                  Skip dalam {countdown} detik
                 </span>
               </div>
             )}

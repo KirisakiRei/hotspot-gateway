@@ -23,7 +23,7 @@ export function ConnectedScreen() {
   };
 
   const handleDisconnect = async () => {
-    if (confirm('Apakah Anda yakin ingin memutus koneksi internet?')) {
+    if (confirm('Yakin ingin disconnect dari internet?')) {
       await disconnectSession();
     }
   };
@@ -160,15 +160,15 @@ export function ConnectedScreen() {
             <h3 className="text-sm font-medium text-foreground mb-3">Status Koneksi</h3>
             <div className="space-y-2">
               <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Alamat IP</span>
+                <span className="text-muted-foreground">IP Address</span>
                 <span className="font-medium text-foreground">{state.session.ip}</span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Alamat Perangkat</span>
+                <span className="text-muted-foreground">MAC Address</span>
                 <span className="font-mono text-xs font-medium text-foreground">{state.session.mac}</span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Nama Pengguna</span>
+                <span className="text-muted-foreground">Username</span>
                 <span className="font-medium text-foreground">{state.session.username}</span>
               </div>
               <div className="flex justify-between text-sm">
@@ -215,8 +215,8 @@ export function ConnectedScreen() {
         {/* Instructions */}
         <div className="bg-muted/30 rounded-xl p-4 mb-6">
           <p className="text-sm text-muted-foreground text-center">
-            Halaman ini dapat tetap terbuka selama Anda terhubung ke internet.
-            Anda dapat mengecilkannya dan membuka tab baru.
+            Halaman ini bisa tetap terbuka selama Anda terhubung ke internet.
+            Silakan minimize dan buka tab baru untuk browsing.
           </p>
         </div>
 
@@ -233,12 +233,12 @@ export function ConnectedScreen() {
             {state.loading ? (
               <>
                 <Loader2 className="w-5 h-5 animate-spin" />
-                Memutuskan...
+                Disconnecting...
               </>
             ) : (
               <>
                 <LogOut className="w-5 h-5" />
-                Putuskan Koneksi
+                Disconnect
               </>
             )}
           </button>
@@ -249,7 +249,7 @@ export function ConnectedScreen() {
               href={state.deviceInfo.linkOrig}
               className="btn-primary w-full flex items-center justify-center gap-2"
             >
-              Lanjutkan Menjelajah
+              Lanjut Browsing
             </a>
           )}
         </div>
