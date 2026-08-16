@@ -15,7 +15,7 @@ const WhatIsSection = () => (
       <ScrollReveal>
         <div className="text-center mb-16">
           <h2 className="text-3xl md:text-4xl font-bold text-foreground">
-            Apa itu <span className="text-primary">Wifi Ads</span>?
+            Apa itu <span className="text-primary">Hotspot Portal</span>?
           </h2>
           <p className="text-muted-foreground mt-3 max-w-lg mx-auto">
             Proses sederhana yang menguntungkan semua pihak.
