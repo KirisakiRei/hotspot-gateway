@@ -115,3 +115,11 @@ id_rsa.pub
 *.md
 !README.md
 !**/README.md
+
+# Internal setup guide (mengandung kredensial/arahan khusus produksi)
+panduan-setup-mikrotik.md
+
+# ==========================================
+# Reference project (sudah diadopsi ke frontend/)
+# ==========================================
+landing-page-frontend/

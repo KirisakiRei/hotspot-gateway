@@ -4,7 +4,14 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import type { ReactNode } from "react";
-import Index from "./pages/Index";
+import ScrollToTop from "./components/ScrollToTop";
+import LandingIndex from "./pages/landing/Index";
+import LandingAbout from "./pages/landing/About";
+import LandingAdvertiser from "./pages/landing/Advertiser";
+import LandingAuth from "./pages/landing/Auth";
+import LandingContact from "./pages/landing/Contact";
+import LandingMitra from "./pages/landing/Mitra";
+import LandingOnboarding from "./pages/landing/Onboarding";
 import Portal from "./pages/Portal";
 import AdminLogin from "./pages/admin/AdminLogin";
 import AdminOverview from "./pages/admin/AdminOverview";
@@ -34,10 +41,22 @@ const App = () => {
         <Toaster />
         <Sonner />
         <BrowserRouter>
+          <ScrollToTop />
           <Routes>
-            <Route path="/" element={<Navigate to="/portal" replace />} />
-            <Route path="/home" element={<Index />} />
+            {/* Landing pages */}
+            <Route path="/" element={<LandingIndex />} />
+            <Route path="/about" element={<LandingAbout />} />
+            <Route path="/advertiser" element={<LandingAdvertiser />} />
+            <Route path="/login" element={<LandingAuth />} />
+            <Route path="/register" element={<LandingAuth />} />
+            <Route path="/contact" element={<LandingContact />} />
+            <Route path="/mitra" element={<LandingMitra />} />
+            <Route path="/onboarding" element={<LandingOnboarding />} />
+
+            {/* Hotspot portal */}
             <Route path="/portal" element={<Portal />} />
+
+            {/* Admin */}
             <Route path="/admin/login" element={<AdminLogin />} />
             <Route path="/admin" element={<RequireAuth><AdminOverview /></RequireAuth>} />
             <Route path="/admin/users" element={<RequireAuth><AdminUsers /></RequireAuth>} />
@@ -46,6 +65,7 @@ const App = () => {
             <Route path="/admin/logs" element={<RequireAuth><AdminLogs /></RequireAuth>} />
             <Route path="/admin/router" element={<RequireAuth><AdminRouter /></RequireAuth>} />
             <Route path="/admin/settings" element={<RequireAuth><AdminSettings /></RequireAuth>} />
+
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
@@ -55,3 +75,4 @@ const App = () => {
 };
 
 export default App;
+

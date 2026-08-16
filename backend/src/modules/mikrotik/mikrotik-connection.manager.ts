@@ -748,7 +748,7 @@ export class MikrotikConnectionManager implements OnModuleInit, OnModuleDestroy 
     const host =
       (await this.getSetting('mikrotik_host')) ||
       this.configService.get('MIKROTIK_HOST') ||
-      '192.168.88.1';
+      '192.168.10.1';
 
     const portStr =
       (await this.getSetting('mikrotik_port')) ||

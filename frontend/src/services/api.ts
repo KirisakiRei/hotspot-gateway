@@ -258,6 +258,16 @@ export interface SessionInfo {
   };
 }
 
+export interface AuthenticateVoucherResponse {
+  alreadyConnected?: boolean;
+  message?: string;
+  credentials?: {
+    username: string;
+    password: string;
+  };
+  session?: SessionInfo;
+}
+
 export const voucherApi = {
   // Portal endpoints (public) - use SLOW timeout for Mikrotik operations
   request: (data: RequestVoucherRequest) => api.post<ApiResponse<{ voucher: Voucher; message: string }>>('/vouchers/request', data, { timeout: TIMEOUTS.SLOW, skipAuthRedirect: true }),
@@ -265,7 +275,7 @@ export const voucherApi = {
   redeem: (data: RedeemVoucherRequest) => api.post<ApiResponse<{ session: SessionInfo; message: string }>>('/vouchers/redeem', data, { timeout: TIMEOUTS.SLOW, skipAuthRedirect: true }),
   
   // Phase 3: Authentication endpoints - use SLOW for Mikrotik operations
-  authenticate: (data: AuthenticateVoucherRequest) => api.post<ApiResponse<{ session: SessionInfo; message: string; loginUrl?: string }>>('/vouchers/authenticate', data, { timeout: TIMEOUTS.SLOW, skipAuthRedirect: true }),
+  authenticate: (data: AuthenticateVoucherRequest) => api.post<ApiResponse<AuthenticateVoucherResponse>>('/vouchers/authenticate', data, { timeout: TIMEOUTS.SLOW, skipAuthRedirect: true }),
   checkSession: (params: CheckSessionRequest) => api.get<ApiResponse<SessionInfo | null>>('/vouchers/check-session', { params, skipAuthRedirect: true }),
   getPending: (params: { mac: string }) => api.get<ApiResponse<{
     pending: boolean;

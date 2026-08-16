@@ -181,7 +181,7 @@ async function main() {
       data: {
         phone: `+62812345${String(i).padStart(4, '0')}`,
         macAddress: `AA:BB:CC:DD:EE:${String(i).padStart(2, '0')}`,
-        ipAddress: `192.168.1.${100 + i}`,
+        ipAddress: `192.168.10.${100 + i}`,
         status: i <= 3 ? 'ONLINE' : 'OFFLINE',
         loginAt: i <= 3 ? new Date() : null,
       },

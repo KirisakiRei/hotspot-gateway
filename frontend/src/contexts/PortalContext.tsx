@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
-import { advertisementApi, voucherApi, type Advertisement, type Voucher, type SessionInfo, type TrackAdRequest, handleApiError } from '@/services/api';
+import { advertisementApi, voucherApi, type Advertisement, type Voucher, type SessionInfo, type TrackAdRequest, type AuthenticateVoucherResponse, handleApiError } from '@/services/api';
 import { useToast } from '@/hooks/use-toast';
 
 export type PortalStep = 'video' | 'form' | 'voucher' | 'success' | 'connected';
@@ -69,6 +69,38 @@ const clearProgress = () => {
   localStorage.removeItem(PORTAL_PROGRESS_KEY);
 };
 
+/**
+ * Submit form native (PAP) ke endpoint login MikroTik.
+ * MikroTik memvalidasi username/password terhadap /ip hotspot user,
+ * membuat cookie sesi, lalu meredirect browser ke `dst` (link-orig).
+ */
+const submitNativeLoginForm = (
+  action: string,
+  dst: string,
+  username: string,
+  password: string,
+) => {
+  const form = document.createElement('form');
+  form.method = 'POST';
+  form.action = action;
+  form.style.display = 'none';
+
+  const appendField = (name: string, value: string) => {
+    const input = document.createElement('input');
+    input.type = 'hidden';
+    input.name = name;
+    input.value = value;
+    form.appendChild(input);
+  };
+
+  if (dst) appendField('dst', dst);
+  appendField('username', username);
+  appendField('password', password);
+
+  document.body.appendChild(form);
+  form.submit();
+};
+
 interface PortalContextType {
   state: PortalState;
   setStep: (step: PortalStep) => void;
@@ -90,7 +122,7 @@ interface PortalContextType {
 }
 
 // Parse Mikrotik URL params
-// Mikrotik sends: ?mac=AA:BB:CC:DD:EE:FF&ip=192.168.1.100&link-login=...&link-login-only=...&link-orig=...&error=...
+// Mikrotik sends: ?mac=AA:BB:CC:DD:EE:FF&ip=192.168.10.100&link-login=...&link-login-only=...&link-orig=...&error=...
 // After successful login: ?status=connected&mac=...&ip=...&username=...
 const parseDeviceInfoFromUrl = (): DeviceInfo & { status?: string; username?: string } => {
   const params = new URLSearchParams(window.location.search);
@@ -107,7 +139,7 @@ const parseDeviceInfoFromUrl = (): DeviceInfo & { status?: string; username?: st
   // Get IP from URL first, then localStorage, then mock
   const ipFromUrl = params.get('ip');
   const ipFromStorage = localStorage.getItem('device_ip');
-  const ip = ipFromUrl || ipFromStorage || (useMockDevice ? '192.168.88.100' : '');
+  const ip = ipFromUrl || ipFromStorage || (useMockDevice ? '192.168.10.100' : '');
   
   // Store in localStorage for next refresh (if from URL)
   if (macFromUrl) {
@@ -532,36 +564,38 @@ export function PortalProvider({ children }: { children: ReactNode }) {
       });
 
       if (response.data.success && response.data.data) {
-        const data = response.data.data as { session?: SessionInfo; loginUrl?: string };
-        
-        setState(prev => ({ 
-          ...prev, 
-          session: data.session,
-          loading: false 
-        }));
+        const data = response.data.data as AuthenticateVoucherResponse;
 
-        toast({
-          title: 'Menghubungkan...',
-          description: 'Mengarahkan ke halaman login',
-        });
-
-        // IMPORTANT: Redirect to Mikrotik login URL for actual session creation
-        // This is the CORRECT flow - browser must visit Mikrotik to create session
-        if (data.loginUrl) {
-          console.log('🔗 Redirecting to Mikrotik login URL');
-          // Redirect immediately - Mikrotik will handle the login
-          window.location.href = data.loginUrl;
+        // Sudah punya sesi aktif — langsung ke layar connected
+        if (data.alreadyConnected) {
+          setState(prev => ({ ...prev, session: data.session ?? null, loading: false }));
+          setStep('connected');
           return;
         }
-        
-        // Fallback: If no loginUrl, redirect to linkOrig or show connected
-        if (state.deviceInfo.linkOrig) {
-          setTimeout(() => {
-            window.location.href = state.deviceInfo.linkOrig;
-          }, 1000);
-        } else {
-          setStep('connected');
+
+        setState(prev => ({ ...prev, session: data.session ?? null, loading: false }));
+
+        // Opsi A-PAP: submit form native ke $(link-login-only) agar MikroTik
+        // memvalidasi kredensial & membuat sesi secara resmi (bukan via API).
+        const loginAction = state.deviceInfo.linkLoginOnly || state.deviceInfo.linkLogin;
+        const username = data.credentials?.username ?? state.voucherCode.toUpperCase();
+        const password = data.credentials?.password ?? state.voucherCode.toUpperCase();
+
+        if (loginAction) {
+          toast({
+            title: 'Menghubungkan...',
+            description: 'Mengalihkan ke router',
+          });
+          submitNativeLoginForm(loginAction, state.deviceInfo.linkOrig, username, password);
+          return;
         }
+
+        // Fallback (mode dev/mock atau akses langsung tanpa param MikroTik)
+        toast({
+          title: 'Berhasil',
+          description: 'Terhubung ke internet',
+        });
+        setStep('connected');
       }
     } catch (error) {
       const errorMsg = handleApiError(error);

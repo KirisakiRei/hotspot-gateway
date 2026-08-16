@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -314,5 +316,9 @@
 
   .safe-area-top {
     padding-top: env(safe-area-inset-top, 16px);
+  }
+
+  .text-balance {
+    text-wrap: balance;
   }
 }

@@ -995,14 +995,12 @@ export class VoucherService {
       };
     }
 
-    // 5. Create or update Mikrotik hotspot user with correct profile
-    this.logger.log(`Authenticating voucher: ${voucher.code}, profile: ${voucher.profile.name}`);
+    // 5. Siapkan hotspot user di router (username = password = kode voucher).
+    // Login final dilakukan native oleh browser via form POST ke $(link-login-only)
+    // (Opsi A-PAP), sehingga MikroTik yang memvalidasi & membuat sesi — bukan backend.
+    this.logger.log(`Preparing hotspot user for voucher: ${voucher.code} (profile: ${voucher.profile.name})`);
     
-    let loginUrl: string | undefined;
     try {
-      // First, create/update the hotspot user with the correct profile
-      this.logger.log(`Configuring hotspot user on router: ${voucher.code} (profile: ${voucher.profile.name})`);
-      
       const userCreated = await this.mikrotikService.createOrUpdateHotspotUser(
         voucher.code,
         voucher.code,
@@ -1015,35 +1013,14 @@ export class VoucherService {
       }
 
       this.logger.log(`Hotspot user ready on router: ${voucher.code}`);
-
-      // Authenticate - get login URL for browser redirect
-      const authResult = await this.mikrotikService.authenticateUser(
-        voucher.code,
-        voucher.code,
-        normalizedMac,
-        ip,
-      );
-
-      if (!authResult.success) {
-        this.logger.error(`Authentication rejected for user: ${voucher.code} (${authResult.message})`);
-        throw new BadRequestException('Autentikasi gagal. Silakan coba lagi.');
-      }
-
-      this.logger.log(
-        `User authenticated with voucher: ${voucher.code} (profile: ${voucher.profile.name})`,
-      );
-      
-      // Store loginUrl for later use
-      loginUrl = authResult.loginUrl;
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : String(error);
-      this.logger.error(`Failed to create Mikrotik session: ${msg}`);
+      this.logger.error(`Failed to prepare Mikrotik user: ${msg}`);
       
-      // Return user-friendly error messages
       if (error instanceof BadRequestException) {
         throw error;
       }
-      throw new InternalServerErrorException('Gagal membuat session di Mikrotik. Silakan hubungi admin.');
+      throw new InternalServerErrorException('Gagal menyiapkan user di Mikrotik. Silakan hubungi admin.');
     }
 
     // 6. Update voucher status — conditional update mencegah race condition
@@ -1165,9 +1142,12 @@ export class VoucherService {
 
     return {
       success: true,
-      message: 'Authentication successful',
+      message: 'Voucher siap untuk login native',
       alreadyConnected: false,
-      loginUrl, // Frontend should redirect to this URL for actual Mikrotik login
+      credentials: {
+        username: voucher.code,
+        password: voucher.code,
+      },
       session: {
         mac,
         ip,

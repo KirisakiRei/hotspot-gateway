@@ -879,7 +879,7 @@ export default function AdminSettings() {
                         type="text"
                         value={mikrotikSettings.host}
                         onChange={(e) => setMikrotikSettings(prev => ({ ...prev, host: e.target.value }))}
-                        placeholder="192.168.88.1"
+                        placeholder="10.8.0.2"
                         className="w-full h-10 px-3 rounded-xl bg-secondary border-0 text-sm focus:ring-2 focus:ring-primary"
                       />
                     </div>
