@@ -6,13 +6,15 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { lazy, Suspense, type ReactNode } from "react";
 import ScrollToTop from "./components/ScrollToTop";
 
-// ── Landing pages (lazy) ──────────────────────────────────────────────────────
-const LandingIndex     = lazy(() => import("./pages/landing/Index"));
-const LandingAbout     = lazy(() => import("./pages/landing/About"));
+// ── Landing index: eager — route utama, harus langsung render ─────────────────
+import LandingIndex from "./pages/landing/Index";
+
+// ── Landing sub-pages (lazy) ──────────────────────────────────────────────────
+const LandingAbout      = lazy(() => import("./pages/landing/About"));
 const LandingAdvertiser = lazy(() => import("./pages/landing/Advertiser"));
-const LandingAuth      = lazy(() => import("./pages/landing/Auth"));
-const LandingContact   = lazy(() => import("./pages/landing/Contact"));
-const LandingMitra     = lazy(() => import("./pages/landing/Mitra"));
+const LandingAuth       = lazy(() => import("./pages/landing/Auth"));
+const LandingContact    = lazy(() => import("./pages/landing/Contact"));
+const LandingMitra      = lazy(() => import("./pages/landing/Mitra"));
 const LandingOnboarding = lazy(() => import("./pages/landing/Onboarding"));
 
 // ── Hotspot portal (lazy) ─────────────────────────────────────────────────────
@@ -28,7 +30,6 @@ const AdminLogs     = lazy(() => import("./pages/admin/AdminLogs"));
 const AdminRouter   = lazy(() => import("./pages/admin/AdminRouter"));
 const AdminSettings = lazy(() => import("./pages/admin/AdminSettings"));
 
-// ── NotFound tetap eager (sangat kecil) ───────────────────────────────────────
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -39,6 +40,13 @@ const RequireAuth = ({ children }: { children: ReactNode }) => {
   return <>{children}</>;
 };
 
+// Fallback minimal — cukup untuk mencegah blank screen tanpa layout shift
+const PageLoader = () => (
+  <div className="min-h-screen flex items-center justify-center bg-background">
+    <div className="w-6 h-6 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+  </div>
+);
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
@@ -46,7 +54,7 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <ScrollToTop />
-        <Suspense fallback={null}>
+        <Suspense fallback={<PageLoader />}>
           <Routes>
             {/* Landing */}
             <Route path="/"            element={<LandingIndex />} />
