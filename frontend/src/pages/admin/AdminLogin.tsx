@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Wifi, Eye, EyeOff, Lock, User, Loader2 } from 'lucide-react';
+import { Eye, EyeOff, Lock, User, Loader2 } from 'lucide-react';
 import { authApi } from '@/services/api';
 import { getErrorMessage } from '@/lib/error';
 
@@ -46,9 +46,7 @@ export default function AdminLogin() {
         <div className="w-full max-w-md relative z-10 animate-fade-in">
           {/* Logo */}
           <div className="flex items-center gap-3 mb-8">
-            <div className="w-12 h-12 rounded-xl bg-primary flex items-center justify-center">
-              <Wifi className="w-6 h-6 text-primary-foreground" />
-            </div>
+            <img src="/brand/logo.png" alt="Hotspot Portal" className="h-12 w-12 object-contain" />
             <div>
               <h1 className="text-xl font-bold text-foreground">Panel Admin</h1>
               <p className="text-sm text-muted-foreground">Hotspot Portal</p>
@@ -162,12 +160,13 @@ export default function AdminLogin() {
 
         {/* Content */}
         <div className="relative z-10 text-center px-12 animate-fade-in">
-          <div className="w-24 h-24 rounded-3xl bg-white/20 backdrop-blur-sm flex items-center justify-center mx-auto mb-8">
-            <Wifi className="w-12 h-12 text-white" />
+          <div className="rounded-2xl bg-slate-950/60 px-6 py-4 mx-auto mb-8 inline-flex">
+            <img
+              src="/brand/wordmark.png"
+              alt="Hotspot Portal"
+              className="h-16 w-auto max-w-[320px] object-contain"
+            />
           </div>
-          <h2 className="text-4xl font-bold text-white mb-4">
-            HotSpot Portal
-          </h2>
           <p className="text-xl text-white/80 max-w-md mx-auto">
             Kelola WiFi publik, pantau pengguna, dan buat voucher dalam satu dasbor.
           </p>

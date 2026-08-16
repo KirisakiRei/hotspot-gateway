@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { Wifi, Smartphone } from 'lucide-react';
+import { Smartphone } from 'lucide-react';
 
 const Index = () => {
   return (
@@ -30,20 +30,20 @@ const Index = () => {
 
       {/* Header */}
       <header className="p-6 flex items-center justify-center relative z-10">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center">
-            <Wifi className="w-5 h-5 text-primary-foreground" />
-          </div>
-          <span className="text-lg font-semibold text-foreground">HotSpot Portal</span>
+        <div className="rounded-2xl bg-slate-950 px-4 py-2">
+          <img
+            src="/brand/wordmark.png"
+            alt="Hotspot Portal"
+            className="h-10 w-auto max-w-[220px] object-contain"
+          />
         </div>
       </header>
 
       {/* Hero */}
       <main className="flex-1 flex items-center justify-center p-6 relative z-10">
         <div className="max-w-md text-center animate-fade-in">
-          <div className="w-24 h-24 rounded-3xl bg-primary/10 flex items-center justify-center mx-auto mb-8 relative">
-            <Wifi className="w-12 h-12 text-primary" />
-            {/* Decorative ring */}
+          <div className="mx-auto mb-8 relative inline-flex items-center justify-center">
+            <img src="/brand/logo.png" alt="" className="h-24 w-24 object-contain" />
             <div className="absolute inset-0 rounded-3xl border-2 border-primary/20 animate-ping" style={{ animationDuration: '2s' }} />
           </div>
           

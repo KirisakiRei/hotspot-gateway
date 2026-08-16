@@ -1,4 +1,4 @@
-import { CheckCircle2, Wifi } from 'lucide-react';
+import { CheckCircle2 } from 'lucide-react';
 
 export function SuccessScreen() {
   const handleBrowse = () => {
@@ -31,10 +31,7 @@ export function SuccessScreen() {
           Selamat! Anda sekarang terhubung ke jaringan WiFi gratis
         </p>
 
-        {/* Wifi Icon */}
-        <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-8">
-          <Wifi className="w-8 h-8 text-primary" />
-        </div>
+        <img src="/brand/logo.png" alt="" className="h-16 w-16 object-contain mb-8" />
       </div>
 
       {/* Bottom Section */}

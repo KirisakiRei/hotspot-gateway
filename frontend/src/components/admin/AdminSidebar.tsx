@@ -6,7 +6,6 @@ import {
   Video,
   FileText,
   Settings,
-  Wifi,
   LogOut,
   Router,
 } from 'lucide-react';
@@ -26,9 +25,7 @@ export function AdminSidebar() {
     <aside className="admin-sidebar">
       <div className="p-6 border-b border-sidebar-border">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center">
-            <Wifi className="w-5 h-5 text-primary-foreground" />
-          </div>
+          <img src="/brand/logo.png" alt="Hotspot Portal" className="h-10 w-10 object-contain" />
           <div>
             <h1 className="font-semibold text-sidebar-foreground">Hotspot</h1>
             <p className="text-xs text-muted-foreground">Panel Admin</p>
