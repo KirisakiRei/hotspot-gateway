@@ -1,0 +1,318 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Light theme - clean & friendly */
+    --background: 0 0% 100%;
+    --foreground: 220 15% 15%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 220 15% 15%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 15% 15%;
+
+    /* Primary - iOS Blue #0A84FF */
+    --primary: 211 100% 52%;
+    --primary-foreground: 0 0% 100%;
+
+    /* Secondary - Light gray surface */
+    --secondary: 220 14% 96%;
+    --secondary-foreground: 220 15% 25%;
+
+    /* Muted - Softer backgrounds */
+    --muted: 220 14% 96%;
+    --muted-foreground: 220 10% 46%;
+
+    /* Accent - Subtle highlight */
+    --accent: 211 100% 96%;
+    --accent-foreground: 211 100% 40%;
+
+    /* Destructive - Error states */
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    /* Success - Confirmation */
+    --success: 142 76% 45%;
+    --success-foreground: 0 0% 100%;
+
+    /* Warning */
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
+
+    /* Borders & Inputs */
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
+    --ring: 211 100% 52%;
+
+    --radius: 0.5rem;
+
+    /* Sidebar - Admin dashboard */
+    --sidebar-background: 220 20% 98%;
+    --sidebar-foreground: 220 15% 25%;
+    --sidebar-primary: 211 100% 52%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 211 100% 96%;
+    --sidebar-accent-foreground: 211 100% 40%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 211 100% 52%;
+
+    /* Custom shadows */
+    --shadow-sm: 0 1px 2px 0 hsl(220 15% 15% / 0.04);
+    --shadow-md: 0 4px 6px -1px hsl(220 15% 15% / 0.06), 0 2px 4px -2px hsl(220 15% 15% / 0.04);
+    --shadow-lg: 0 10px 15px -3px hsl(220 15% 15% / 0.08), 0 4px 6px -4px hsl(220 15% 15% / 0.04);
+    --shadow-card: 0 2px 8px -2px hsl(220 15% 15% / 0.08);
+  }
+
+  .dark {
+    --background: 220 20% 10%;
+    --foreground: 0 0% 98%;
+
+    --card: 220 20% 12%;
+    --card-foreground: 0 0% 98%;
+
+    --popover: 220 20% 12%;
+    --popover-foreground: 0 0% 98%;
+
+    --primary: 211 100% 52%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 220 20% 18%;
+    --secondary-foreground: 0 0% 90%;
+
+    --muted: 220 20% 18%;
+    --muted-foreground: 220 10% 60%;
+
+    --accent: 211 100% 20%;
+    --accent-foreground: 211 100% 70%;
+
+    --destructive: 0 62% 50%;
+    --destructive-foreground: 0 0% 100%;
+
+    --success: 142 70% 40%;
+    --success-foreground: 0 0% 100%;
+
+    --warning: 38 90% 45%;
+    --warning-foreground: 0 0% 100%;
+
+    --border: 220 20% 20%;
+    --input: 220 20% 20%;
+    --ring: 211 100% 52%;
+
+    --sidebar-background: 220 20% 8%;
+    --sidebar-foreground: 0 0% 90%;
+    --sidebar-primary: 211 100% 52%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 211 100% 15%;
+    --sidebar-accent-foreground: 211 100% 70%;
+    --sidebar-border: 220 20% 18%;
+    --sidebar-ring: 211 100% 52%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html {
+    font-family: 'Poppins', system-ui, sans-serif;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+  }
+
+  /* Smooth scrolling */
+  html {
+    scroll-behavior: smooth;
+  }
+
+  /* Better touch targets */
+  button, a, input, textarea, select {
+    touch-action: manipulation;
+  }
+
+  /* Remove default focus outline, we'll add our own */
+  *:focus {
+    outline: none;
+  }
+
+  *:focus-visible {
+    @apply ring-2 ring-ring ring-offset-2 ring-offset-background;
+  }
+}
+
+@layer components {
+  /* Mobile portal container */
+  .portal-container {
+    @apply min-h-screen w-full max-w-[420px] mx-auto bg-background;
+  }
+
+  /* Card with soft shadow */
+  .card-elevated {
+    box-shadow: var(--shadow-card);
+    @apply bg-card rounded-xl border border-border;
+  }
+
+  /* Primary button styles */
+  .btn-primary {
+    @apply bg-primary text-primary-foreground font-medium rounded-xl h-12 px-6;
+    @apply transition-all duration-200 ease-out;
+    @apply hover:opacity-90 active:scale-[0.98];
+    @apply disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100;
+  }
+
+  /* Secondary button styles */
+  .btn-secondary {
+    @apply bg-secondary text-secondary-foreground font-medium rounded-xl h-12 px-6;
+    @apply transition-all duration-200 ease-out;
+    @apply hover:bg-secondary/80 active:scale-[0.98];
+  }
+
+  /* Ghost button */
+  .btn-ghost {
+    @apply text-foreground font-medium rounded-xl h-12 px-6;
+    @apply transition-all duration-200 ease-out;
+    @apply hover:bg-secondary active:scale-[0.98];
+  }
+
+  /* Input field styles */
+  .input-field {
+    @apply w-full h-12 px-4 bg-secondary border-0 rounded-xl;
+    @apply text-foreground placeholder:text-muted-foreground;
+    @apply transition-all duration-200;
+    @apply focus:ring-2 focus:ring-primary focus:ring-offset-0;
+  }
+
+  .input-field-error {
+    @apply ring-2 ring-destructive;
+  }
+
+  /* Admin sidebar */
+  .admin-sidebar {
+    @apply w-64 bg-sidebar border-r border-sidebar-border;
+    @apply flex flex-col h-screen fixed left-0 top-0;
+  }
+
+  /* Admin content area */
+  .admin-content {
+    @apply ml-64 min-h-screen bg-background;
+  }
+
+  /* Stat card */
+  .stat-card {
+    @apply bg-card rounded-xl p-5 border border-border;
+    box-shadow: var(--shadow-sm);
+  }
+
+  /* Data table */
+  .data-table {
+    @apply w-full border-collapse;
+  }
+
+  .data-table th {
+    @apply text-left text-sm font-medium text-muted-foreground px-4 py-3 border-b border-border bg-secondary/50;
+  }
+
+  .data-table td {
+    @apply px-4 py-3 border-b border-border text-sm;
+  }
+
+  .data-table tr:hover td {
+    @apply bg-secondary/30;
+  }
+}
+
+@layer utilities {
+  /* Fade in animation */
+  .animate-fade-in {
+    animation: fadeIn 0.3s ease-out forwards;
+  }
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  /* Slide up animation */
+  .animate-slide-up {
+    animation: slideUp 0.4s ease-out forwards;
+  }
+
+  @keyframes slideUp {
+    from {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  /* Scale in animation */
+  .animate-scale-in {
+    animation: scaleIn 0.3s ease-out forwards;
+  }
+
+  @keyframes scaleIn {
+    from {
+      opacity: 0;
+      transform: scale(0.95);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+
+  /* Pulse animation for success */
+  .animate-success-pulse {
+    animation: successPulse 0.6s ease-out;
+  }
+
+  @keyframes successPulse {
+    0% {
+      transform: scale(0);
+      opacity: 0;
+    }
+    50% {
+      transform: scale(1.1);
+    }
+    100% {
+      transform: scale(1);
+      opacity: 1;
+    }
+  }
+
+  /* Stagger children animation */
+  .stagger-children > * {
+    opacity: 0;
+    animation: fadeIn 0.3s ease-out forwards;
+  }
+
+  .stagger-children > *:nth-child(1) { animation-delay: 0ms; }
+  .stagger-children > *:nth-child(2) { animation-delay: 50ms; }
+  .stagger-children > *:nth-child(3) { animation-delay: 100ms; }
+  .stagger-children > *:nth-child(4) { animation-delay: 150ms; }
+  .stagger-children > *:nth-child(5) { animation-delay: 200ms; }
+
+  /* Safe area padding for mobile */
+  .safe-area-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 16px);
+  }
+
+  .safe-area-top {
+    padding-top: env(safe-area-inset-top, 16px);
+  }
+}

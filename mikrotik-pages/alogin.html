@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="pragma" content="no-cache">
+    <meta http-equiv="expires" content="-1">
+    <title>Login Berhasil - WiFi Hotspot</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            padding: 20px;
+        }
+        
+        .container {
+            background: white;
+            padding: 40px;
+            border-radius: 20px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+            text-align: center;
+            max-width: 400px;
+            width: 100%;
+        }
+        
+        .success-icon {
+            width: 80px;
+            height: 80px;
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 24px;
+            animation: scaleIn 0.5s ease-out;
+        }
+        
+        @keyframes scaleIn {
+            0% { transform: scale(0); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+        
+        .success-icon svg {
+            width: 40px;
+            height: 40px;
+            color: white;
+        }
+        
+        h1 {
+            color: #1f2937;
+            font-size: 24px;
+            margin-bottom: 12px;
+        }
+        
+        .subtitle {
+            color: #6b7280;
+            font-size: 16px;
+            margin-bottom: 24px;
+        }
+        
+        .spinner {
+            width: 24px;
+            height: 24px;
+            border: 3px solid #e5e7eb;
+            border-top-color: #10b981;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 16px;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .redirect-text {
+            color: #9ca3af;
+            font-size: 14px;
+            margin-bottom: 16px;
+        }
+        
+        .btn {
+            display: inline-block;
+            padding: 12px 32px;
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+            text-decoration: none;
+            border-radius: 12px;
+            font-weight: 600;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px -10px rgba(16, 185, 129, 0.5);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="success-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+            </svg>
+        </div>
+        
+        <h1>Login Berhasil!</h1>
+        <p class="subtitle">Anda sekarang terhubung ke internet</p>
+        
+        <div class="spinner"></div>
+        <p class="redirect-text">Mengalihkan...</p>
+        
+        <a href="#" class="btn" id="continueBtn">Lanjut Browsing</a>
+    </div>
+    
+    <script>
+        // Portal success URL - GANTI DENGAN IP FRONTEND ANDA
+        var PORTAL_SUCCESS_URL = 'http://10.10.10.2:5173/portal';
+        
+        // Mikrotik variables
+        var username = '$(username)';
+        var mac = '$(mac)';
+        var ip = '$(ip)';
+        var linkOrig = '$(link-orig)';
+        
+        // Build redirect URL dengan status=connected
+        var redirectUrl = PORTAL_SUCCESS_URL + 
+            '?status=connected' +
+            '&mac=' + encodeURIComponent(mac) + 
+            '&ip=' + encodeURIComponent(ip) +
+            '&username=' + encodeURIComponent(username);
+        
+        // Jika ada link-orig yang valid, simpan
+        if (linkOrig && linkOrig !== '' && !linkOrig.includes('$(')) {
+            redirectUrl += '&link-orig=' + encodeURIComponent(linkOrig);
+        }
+        
+        // Update button href
+        document.getElementById('continueBtn').href = redirectUrl;
+        
+        // Auto redirect setelah 1.5 detik
+        setTimeout(function() {
+            window.location.href = redirectUrl;
+        }, 1500);
+    </script>
+</body>
+</html>

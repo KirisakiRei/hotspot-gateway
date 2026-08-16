@@ -1,0 +1,413 @@
+// Mikrotik Hotspot Management System - Database Schema
+// Generated: 2026-01-19
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// ==========================================
+// ADMIN & AUTHENTICATION
+// ==========================================
+
+model Admin {
+  id        String    @id @default(uuid(7))
+  email     String    @unique
+  password  String    // bcrypt hashed password
+  name      String
+  role      String    @default("OPERATOR") // Supports custom roles
+  avatar    String?   @db.Text
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  logs SystemLog[]
+
+  @@map("admins")
+}
+
+// Legacy enum kept for reference - now using String for flexible custom roles
+enum AdminRole {
+  SUPER_ADMIN
+  ADMIN
+  OPERATOR
+}
+
+// ==========================================
+// USER / CLIENT MANAGEMENT
+// ==========================================
+
+model User {
+  id         String     @id @default(uuid(7))
+  phone      String     @unique
+  name       String?    // WhatsApp contact name
+  email      String?
+  macAddress String?    @unique // Nullable to allow clearing on conflict
+  ipAddress  String?
+  deviceName String?
+
+  // Voucher & Session
+  voucherId String?
+  voucher   Voucher? @relation(fields: [voucherId], references: [id], onDelete: SetNull)
+
+  // Session info
+  status   UserStatus @default(OFFLINE)
+  server   String?
+  loginAt  DateTime?
+  logoutAt DateTime?
+
+  // Usage
+  quotaUsed BigInt @default(0) // in bytes
+  timeUsed  Int    @default(0) // in seconds
+
+  // Flags
+  isBlocked   Boolean @default(false)
+  blockReason String? @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  sessions Session[]
+  logs     SystemLog[]
+
+  @@index([status])
+  @@index([macAddress])
+  @@index([loginAt])
+  @@map("users")
+}
+
+enum UserStatus {
+  ONLINE
+  OFFLINE
+  BLOCKED
+  EXPIRED
+}
+
+// ==========================================
+// ROUTER MANAGEMENT (multi-router foundation)
+// ==========================================
+
+model Router {
+  id        String   @id @default(uuid(7))
+  name      String
+  location  String?
+  host      String
+  port      Int      @default(8728)
+  username  String   @default("admin")
+  password  String? // dienkripsi AES-256-CBC (ENCRYPTION_KEY)
+  radiusSecret String? // shared secret FreeRADIUS (dienkripsi)
+  monitoringInterval Int @default(30) // detik
+  apiEnabled Boolean  @default(true)
+  status    String   @default("ACTIVE") // ACTIVE | DISABLED
+  lastSeenAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  sessions Session[]
+
+  @@index([status])
+  @@map("routers")
+}
+
+model Session {
+  id         String   @id @default(uuid(7))
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  routerId   String?
+  router     Router?  @relation(fields: [routerId], references: [id], onDelete: SetNull)
+  ipAddress  String
+  macAddress String
+  server     String?
+  bytesIn    BigInt   @default(0)
+  bytesOut   BigInt   @default(0)
+  startedAt  DateTime @default(now())
+  endedAt    DateTime?
+
+  @@index([userId])
+  @@index([startedAt])
+  @@index([routerId])
+  @@index([macAddress, endedAt])
+  @@map("sessions")
+}
+
+// ==========================================
+// VOUCHER MANAGEMENT
+// ==========================================
+
+model VoucherProfile {
+  id          String   @id @default(uuid(7))
+  name        String   @unique
+  description String?  @db.Text
+  
+  // Limits
+  duration      Int     // in minutes
+  quota         BigInt? // in bytes, null = unlimited
+  uploadSpeed   Int?    // in kbps, null = unlimited
+  downloadSpeed Int?    // in kbps, null = unlimited
+  
+  // Settings
+  sharedUsers  Int @default(1) // max concurrent users
+  validityDays Int @default(30) // days until voucher expires after creation
+  
+  // Pricing (optional)
+  price Decimal? @db.Decimal(10, 2)
+  
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  vouchers Voucher[]
+
+  @@map("voucher_profiles")
+}
+
+model Voucher {
+  id      String        @id @default(uuid(7))
+  code    String        @unique
+  
+  profileId String
+  profile   VoucherProfile @relation(fields: [profileId], references: [id])
+  
+  // Status
+  status VoucherStatus @default(UNUSED)
+  
+  // Usage tracking — usedBy = MAC address pemakai (normalisasi: uppercase, ':')
+  usedBy      String?   // MAC address device yang mengklaim
+  usedAt      DateTime?
+  activatedAt DateTime?
+  expiresAt   DateTime?
+  
+  // Batch info
+  batchId String?
+  
+  // Stats
+  quotaUsed BigInt @default(0)
+  timeUsed  Int    @default(0)
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users User[]
+
+  @@index([code])
+  @@index([status])
+  @@index([profileId])
+  @@index([usedBy, expiresAt, batchId])
+  @@map("vouchers")
+}
+
+enum VoucherStatus {
+  UNUSED
+  ACTIVE
+  USED
+  EXPIRED
+  DISABLED
+}
+
+model VoucherBatch {
+  id        String   @id @default(uuid(7))
+  name      String
+  profileId String
+  quantity  Int
+  prefix    String?
+  createdBy String
+  createdAt DateTime @default(now())
+
+  @@map("voucher_batches")
+}
+
+// ==========================================
+// ADVERTISEMENT MANAGEMENT (ENHANCED)
+// ==========================================
+
+model Advertisement {
+  id          String    @id @default(uuid(7))
+  title       String
+  description String?   @db.Text
+  
+  // Media - YouTube Focus
+  videoType   VideoType @default(YOUTUBE)
+  videoUrl    String    @db.Text // Full YouTube URL
+  youtubeId   String?   // Extracted ID (dQw4w9WgXcQ)
+  thumbnailUrl String?  @db.Text // Auto-fetch dari YouTube
+  duration    Int       // Total duration (seconds)
+  
+  // Display & Trim Settings
+  startTime       Int @default(0) // Trim start (seconds)
+  endTime         Int? // Trim end (seconds), null = full video
+  displayDuration Int  // Actual display duration (seconds)
+  
+  // Skip Settings
+  skipable  Boolean @default(true)
+  skipAfter Int     @default(5) // Skip available after X seconds
+  
+  // Rotation & Priority
+  priority       Int  @default(0) // Higher = more priority (0-100)
+  weight         Int  @default(1) // For weighted random selection
+  maxViewsPerDay Int? // Daily view limit, null = unlimited
+  
+  // Scheduling
+  isActive  Boolean   @default(false)
+  startDate DateTime?
+  endDate   DateTime?
+  
+  // Analytics
+  views          Int   @default(0)
+  completions    Int   @default(0) // Watched until end
+  skips          Int   @default(0) // Skipped before end
+  avgWatchTime   Float @default(0) // Average watch time (seconds)
+  completionRate Float @default(0) // completions/views * 100
+  
+  // Targeting (JSON for flexibility)
+  targeting Json? // { timeSlots: [], daysOfWeek: [], deviceTypes: [] }
+  
+  // Fallback
+  fallbackAdId String?
+  fallback     Advertisement?  @relation("AdFallback", fields: [fallbackAdId], references: [id], onDelete: SetNull)
+  fallbackFor  Advertisement[] @relation("AdFallback")
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([priority, isActive])
+  @@index([youtubeId])
+  @@index([startDate, endDate])
+  @@map("advertisements")
+}
+
+enum VideoType {
+  YOUTUBE
+  LOCAL
+  GDRIVE
+  URL
+}
+
+// ==========================================
+// WHATSAPP GATEWAY (BAILEYS)
+// ==========================================
+
+model WaSession {
+  id        String   @id @default(uuid(7))
+  phone     String   @unique // Nomor pengirim (format internasional, tanpa '+')
+  name      String?  // Label internal (mis. "Router 1 - Tim A")
+  active    Boolean  @default(true) // Ikut round-robin / boleh dipakai kirim
+  state     String   @default("DISCONNECTED") // Cache runtime: DISCONNECTED|CONNECTING|CONNECTED
+  sentCount Int      @default(0) // Counter round-robin (direset oleh manager)
+  pairedAt  DateTime? // Terakhir berhasil pairing (QR ter-scan)
+  lastSeenAt DateTime? // Terakhir socket aktif
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  logs WaMessageLog[]
+
+  @@index([active])
+  @@map("wa_sessions")
+}
+
+model WaMessageLog {
+  id             String   @id @default(uuid(7))
+  sessionId      String?
+  session        WaSession? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+  sessionPhone   String   // Nomor pengirim (denormalisasi agar tetap tercatat walau sesi dihapus)
+  recipientPhone String   // Nomor penerima
+  messageType    String   @default("TEXT") // TEXT | VOUCHER
+  message        String   @db.Text // Isi pesan yang dikirim (berisi template terpilih)
+  status         String   @default("PENDING") // PENDING | SENT | FAILED | REJECTED
+  errorMessage   String?  @db.Text
+  voucherCode    String?  // Traceability ke voucher, bila dikirim via sendVoucher
+  sentAt         DateTime?
+  createdAt      DateTime @default(now())
+
+  @@index([sessionPhone, createdAt])
+  @@index([recipientPhone, createdAt])
+  @@index([status])
+  @@index([createdAt])
+  @@map("wa_message_logs")
+}
+
+// ==========================================
+// SYSTEM & LOGS
+// ==========================================
+
+model SystemLog {
+  id String @id @default(uuid(7))
+  
+  // Actor
+  userId  String?
+  user    User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+  adminId String?
+  admin   Admin?  @relation(fields: [adminId], references: [id], onDelete: SetNull)
+  
+  // Event info
+  type        LogType
+  action      String
+  description String? @db.Text
+  
+  // Context
+  ipAddress  String?
+  macAddress String?
+  userAgent  String? @db.Text
+  metadata   Json?
+  
+  // Status
+  status       LogStatus @default(SUCCESS)
+  errorMessage String?   @db.Text
+  
+  createdAt DateTime @default(now())
+
+  @@index([type])
+  @@index([status])
+  @@index([createdAt])
+  @@index([adminId])
+  @@map("system_logs")
+}
+
+enum LogType {
+  AUTH
+  USER
+  VOUCHER
+  SESSION
+  ADMIN
+  SYSTEM
+  ERROR
+}
+
+enum LogStatus {
+  SUCCESS
+  WARNING
+  ERROR
+  INFO
+}
+
+// ==========================================
+// SETTINGS & CONFIGURATION
+// ==========================================
+
+model Setting {
+  id          String      @id @default(uuid(7))
+  key         String      @unique
+  value       String      @db.Text
+  type        SettingType @default(STRING)
+  group       String      @default("general") // 'mikrotik', 'waha', 'portal', 'system'
+  description String?     @db.Text
+  isEncrypted Boolean     @default(false) // For passwords/API keys
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([group])
+  @@map("settings")
+}
+
+enum SettingType {
+  STRING
+  NUMBER
+  BOOLEAN
+  JSON
+  PASSWORD
+}

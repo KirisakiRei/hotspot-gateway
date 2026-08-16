@@ -1,0 +1,17 @@
+# Dependencies
+node_modules/
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Generated
+/generated/prisma
+dist/
+build/
+
+# Runtime & local-only
+public/
+scripts/
+wa-auth/
