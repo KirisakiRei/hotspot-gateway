@@ -11,7 +11,7 @@ import { SessionManager } from './session.manager';
 import {
   buildVoucherMessage,
   formatDuration,
-  normalizePortalUrl,
+  resolvePublicPortalUrl,
 } from './template.pool';
 import {
   IncomingMessage,
@@ -232,14 +232,14 @@ export class WhatsappService implements OnModuleInit {
   ): Promise<boolean> {
     const [portalRaw, envPortal] = await Promise.all([
       this.getSetting('portal_url'),
-      Promise.resolve(this.configService.get<string>('FRONTEND_URL') || 'https://wifi.rekavia.com'),
+      Promise.resolve(this.configService.get<string>('FRONTEND_URL')),
     ]);
 
     const message = buildVoucherMessage({
       code: voucherCode,
       durationText: formatDuration(profile.duration),
       validityDays: profile.validityDays ?? 30,
-      portalUrl: normalizePortalUrl(portalRaw || envPortal),
+      portalUrl: resolvePublicPortalUrl(portalRaw, envPortal),
     });
 
     return this.sendWithRoundRobin({

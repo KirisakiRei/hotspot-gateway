@@ -121,9 +121,39 @@ export function formatDuration(totalMinutes: number): string {
   return `${minutes} menit`;
 }
 
-/** Normalisasi base URL portal (tanpa trailing slash). */
+const DEFAULT_PUBLIC_PORTAL_URL = 'https://wifi.rekavia.com';
+
+function isPrivateOrLocalUrl(value: string): boolean {
+  try {
+    const parsed = new URL(value.includes('://') ? value : `http://${value}`);
+    const host = parsed.hostname.toLowerCase();
+    if (host === 'localhost' || host.endsWith('.local')) return true;
+    if (/^10\./.test(host)) return true;
+    if (/^192\.168\./.test(host)) return true;
+    if (/^172\.(1[6-9]|2\d|3[0-1])\./.test(host)) return true;
+    if (host === '127.0.0.1' || host === '::1') return true;
+    return false;
+  } catch {
+    return true;
+  }
+}
+
+/** Normalisasi base URL portal publik (tanpa trailing slash). */
 export function normalizePortalUrl(raw: string | null | undefined): string {
-  const base = (raw || '').trim();
-  if (!base) return 'http://10.10.10.2';
-  return base.replace(/\/+$/, '');
+  const base = (raw || '').trim().replace(/\/+$/, '');
+  if (!base || isPrivateOrLocalUrl(base)) return DEFAULT_PUBLIC_PORTAL_URL;
+  return base;
+}
+
+/** Pilih URL portal untuk pesan WhatsApp: domain publik, bukan IP lokal. */
+export function resolvePublicPortalUrl(
+  storedUrl?: string | null,
+  envUrl?: string | null,
+): string {
+  const candidates = [envUrl, storedUrl, DEFAULT_PUBLIC_PORTAL_URL];
+  for (const candidate of candidates) {
+    const normalized = (candidate || '').trim().replace(/\/+$/, '');
+    if (normalized && !isPrivateOrLocalUrl(normalized)) return normalized;
+  }
+  return DEFAULT_PUBLIC_PORTAL_URL;
 }
