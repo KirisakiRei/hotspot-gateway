@@ -3,8 +3,40 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { lazy, Suspense, type ReactNode } from "react";
+import { lazy, Suspense, Component, type ReactNode } from "react";
 import ScrollToTop from "./components/ScrollToTop";
+
+// ── Error Boundary — mencegah blank screen jika ada runtime error ─────────────
+class ErrorBoundary extends Component<
+  { children: ReactNode },
+  { error: Error | null }
+> {
+  state = { error: null };
+
+  static getDerivedStateFromError(error: Error) {
+    return { error };
+  }
+
+  render() {
+    if (this.state.error) {
+      return (
+        <div className="min-h-screen flex flex-col items-center justify-center gap-4 p-8 text-center bg-background">
+          <p className="text-lg font-semibold text-foreground">Terjadi kesalahan</p>
+          <p className="text-sm text-muted-foreground max-w-sm">
+            {(this.state.error as Error).message}
+          </p>
+          <button
+            className="px-4 py-2 text-sm bg-primary text-primary-foreground rounded-lg"
+            onClick={() => window.location.reload()}
+          >
+            Muat Ulang
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 // ── Landing index: eager — route utama, harus langsung render ─────────────────
 import LandingIndex from "./pages/landing/Index";
@@ -48,6 +80,7 @@ const PageLoader = () => (
 );
 
 const App = () => (
+  <ErrorBoundary>
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <Toaster />
@@ -85,6 +118,7 @@ const App = () => (
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
+  </ErrorBoundary>
 );
 
 export default App;
