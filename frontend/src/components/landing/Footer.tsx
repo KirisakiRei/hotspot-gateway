@@ -10,16 +10,11 @@ const Footer = () => (
 
         {/* Brand col — full width on mobile */}
         <div className="col-span-2 lg:col-span-1">
-          <div className="flex items-center gap-2 mb-3">
-            <img
-              src="/brand/logo.png"
-              alt="Hotspot Portal"
-              className="h-7 w-7 object-contain"
-            />
+          <div className="mb-4">
             <img
               src="/brand/wordmark.png"
               alt="Hotspot Portal"
-              className="h-5 object-contain"
+              className="h-6 w-auto object-contain"
             />
           </div>
           <p className="text-sm leading-relaxed text-slate-matte-400 max-w-[260px]">

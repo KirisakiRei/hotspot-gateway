@@ -30,16 +30,11 @@ const Navbar = () => {
     >
       <div className="container mx-auto flex items-center justify-between h-16 px-4 lg:px-8">
         {/* Brand */}
-        <Link to="/" className="flex items-center gap-2 group">
+        <Link to="/" className="flex items-center group">
           <img
             src="/brand/logo.png"
             alt="Hotspot Portal"
-            className="h-8 w-8 object-contain"
-          />
-          <img
-            src="/brand/wordmark.png"
-            alt="Hotspot Portal"
-            className="h-6 object-contain hidden sm:block"
+            className="h-8 w-auto object-contain"
           />
         </Link>
 
