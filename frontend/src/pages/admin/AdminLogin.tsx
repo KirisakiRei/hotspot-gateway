@@ -160,13 +160,11 @@ export default function AdminLogin() {
 
         {/* Content */}
         <div className="relative z-10 text-center px-12 animate-fade-in">
-          <div className="rounded-2xl bg-slate-950/60 px-6 py-4 mx-auto mb-8 inline-flex">
-            <img
-              src="/brand/wordmark.png"
-              alt="Hotspot Portal"
-              className="h-16 w-auto max-w-[320px] object-contain"
-            />
-          </div>
+          <img
+            src="/brand/logo.png"
+            alt="Hotspot Portal"
+            className="h-24 w-24 object-contain mx-auto mb-8"
+          />
           <p className="text-xl text-white/80 max-w-md mx-auto">
             Kelola WiFi publik, pantau pengguna, dan buat voucher dalam satu dasbor.
           </p>

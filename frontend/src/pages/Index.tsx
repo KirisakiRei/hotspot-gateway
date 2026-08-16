@@ -30,13 +30,11 @@ const Index = () => {
 
       {/* Header */}
       <header className="p-6 flex items-center justify-center relative z-10">
-        <div className="rounded-2xl bg-slate-950 px-4 py-2">
-          <img
-            src="/brand/wordmark.png"
-            alt="Hotspot Portal"
-            className="h-10 w-auto max-w-[220px] object-contain"
-          />
-        </div>
+        <img
+          src="/brand/logo.png"
+          alt="Hotspot Portal"
+          className="h-12 w-12 object-contain"
+        />
       </header>
 
       {/* Hero */}
