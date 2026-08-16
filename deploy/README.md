@@ -64,6 +64,9 @@ sudo -u hotspot bun install --frozen-lockfile
 sudo -u hotspot bun run build
 sudo rsync -a --delete dist/ /var/www/wifi.rekavia.com/dist/
 sudo chown -R www-data:www-data /var/www/wifi.rekavia.com
+
+# Jika Nginx membaca langsung dari frontend/dist (bukan /var/www/wifi.rekavia.com):
+# sudo bash /var/www/hotspot-gateway/deploy/update.sh
 ```
 
 ## 3. systemd
@@ -130,3 +133,5 @@ Tes: `/ping 10.8.0.1` dari router, `ping 10.8.0.2` dari VPS.
 - Satu proses Nest saja. Jangan scale horizontal (Baileys).
 - Jangan `git push` folder `wa-auth/` atau `.env`.
 - Rebuild frontend setiap kali `VITE_API_URL` berubah.
+- Update berikutnya cukup satu perintah: `sudo bash /var/www/hotspot-gateway/deploy/update.sh`.
+  Skrip itu menarik git, build backend/frontend, merapikan izin `dist/`, lalu restart PM2 + Nginx. Tidak perlu `chmod` manual.
