@@ -337,7 +337,7 @@ export class WhatsappService implements OnModuleInit {
   // ==========================================
 
   private async handleIncoming(sessionPhone: string, message: IncomingMessage): Promise<void> {
-    // Catat pesan masuk
+    // Catat pesan masuk untuk audit log saja tanpa membalas chat
     await this.createLog({
       sessionPhone,
       recipientPhone: message.from,
@@ -345,28 +345,6 @@ export class WhatsappService implements OnModuleInit {
       message: message.text,
       status: 'RECEIVED',
     });
-
-    // Auto-ack: seen sudah dilakukan di client; balas singkat dengan typing
-    const client = this.manager.getSession(sessionPhone);
-    if (!client) return;
-
-    const ack =
-      message.text.trim().length === 0
-        ? null
-        : `Pesan Anda telah kami terima. Terima kasih! 🙏\n\nUntuk bantuan lebih lanjut, silakan hubungi admin.`;
-
-    if (ack) {
-      const result = await client.sendText(message.from, ack);
-      if (result.ok) {
-        await this.createLog({
-          sessionPhone,
-          recipientPhone: message.from,
-          messageType: 'TEXT',
-          message: ack,
-          status: 'SENT',
-        });
-      }
-    }
   }
 
   // ==========================================

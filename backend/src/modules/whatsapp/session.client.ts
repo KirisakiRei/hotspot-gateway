@@ -329,6 +329,14 @@ export class WaSessionClient {
         return;
       }
 
+      // Baileys code 515 (restartRequired): Normal terjadi saat pairing pertama kali / pertukaran kunci selesai.
+      // Cukup reconnect socket tanpa menghapus sesi.
+      if (statusCode === DisconnectReason.restartRequired) {
+        this.nestLogger.log('Connection restart requested by WhatsApp server (code 515). Reconnecting...');
+        this.scheduleReconnect();
+        return;
+      }
+
       // Kondisi permanen: kredensial tidak valid -> harus scan QR ulang
       const fatalReasons = [
         DisconnectReason.loggedOut,
@@ -435,11 +443,8 @@ export class WaSessionClient {
         this.contactCache.set(jid, { ...existing, notify: msg.pushName });
       }
 
-      // Seen (read receipt) untuk pesan masuk
-      if (jid && msg.key.id) {
-        await this.sock?.readMessages([{ remoteJid: jid, id: msg.key.id }]).catch(() => undefined);
-      }
-
+      // Nonaktifkan auto-read (centang biru) otomatis agar tidak mengganggu WhatsApp pribadi
+      // Pesan masuk dicatat untuk log internal
       this.nestLogger.log(`Incoming message from ${from}: ${text.slice(0, 80)}`);
       this.opts.onIncoming?.(this.phone, { from, text, messageId: msg.key.id || '' });
     }
