@@ -81,6 +81,7 @@ export class SessionManager implements OnModuleInit, OnModuleDestroy {
       authBaseDir: this.authBaseDir,
       autoReconnect: this.autoReconnect,
       onStateChange: (phone, state) => {
+        this.persistState(phone, state);
         input.onStateChange?.(phone, state);
         this.logger.log(`Session ${phone} -> ${state}`);
       },
@@ -92,12 +93,25 @@ export class SessionManager implements OnModuleInit, OnModuleDestroy {
 
     this.sessions.set(client.phone, client);
 
-    // Auto-connect saat boot / sesi baru didaftarkan
     client.start().catch((err) => {
       this.logger.error(`Failed to start session ${client.phone}: ${err.message}`);
     });
 
     return client;
+  }
+
+  /** Restart socket agar QR pairing baru muncul (setelah logout / disconnect). */
+  async connectSession(phone: string): Promise<WaSessionClient> {
+    const existing = this.sessions.get(phone);
+    if (existing) {
+      await existing.connect();
+      return existing;
+    }
+    return this.ensureSession({
+      phone,
+      onStateChange: (sessionPhone, state) => this.persistState(sessionPhone, state),
+      onIncoming: (sessionPhone, msg) => this.onIncoming?.(sessionPhone, msg),
+    });
   }
 
   async removeSession(phone: string): Promise<void> {

@@ -233,16 +233,22 @@ export default function AdminSettings() {
   useEffect(() => {
     if (activeTab !== 'whatsapp') return;
     const t = setInterval(async () => {
-      const connecting = waSessionsRef.current.filter((s) => s.state === 'CONNECTING');
-      for (const s of connecting) {
+      const current = waSessionsRef.current;
+      for (const s of current) {
+        if (s.state !== 'CONNECTING') {
+          setWaQr((prev) => (prev[s.phone] ? { ...prev, [s.phone]: '' } : prev));
+          continue;
+        }
         try {
           const r = await whatsappApi.getQr(s.phone);
-          setWaQr((prev) => (prev[s.phone] === r.data.data?.qr ? prev : { ...prev, [s.phone]: r.data.data?.qr || '' }));
+          const nextQr = r.data.data?.qr || '';
+          if (!nextQr) continue;
+          setWaQr((prev) => (prev[s.phone] === nextQr ? prev : { ...prev, [s.phone]: nextQr }));
         } catch {
-          setWaQr((prev) => (prev[s.phone] ? { ...prev, [s.phone]: '' } : prev));
+          /* QR belum siap; biarkan polling berikutnya */
         }
       }
-    }, 3000);
+    }, 2000);
     return () => clearInterval(t);
   }, [activeTab]);
 
@@ -348,6 +354,7 @@ export default function AdminSettings() {
   const connectWhatsappSession = async (phone: string) => {
     try {
       setWaBusyPhone(phone);
+      setWaQr((prev) => ({ ...prev, [phone]: '' }));
       await whatsappApi.connect(phone);
       toast.info(`Menghubungkan ${phone}... scan QR untuk pairing`);
       loadWhatsappData();
@@ -362,8 +369,9 @@ export default function AdminSettings() {
     if (!window.confirm(`Logout nomor ${phone}? Perlu scan QR ulang untuk terhubung kembali.`)) return;
     try {
       setWaBusyPhone(phone);
+      setWaQr((prev) => ({ ...prev, [phone]: '' }));
       await whatsappApi.logout(phone);
-      toast.success('Sesi dilogout');
+      toast.success('Sesi dilogout. Klik tombol Hubungkan untuk menampilkan QR baru.');
       loadWhatsappData();
     } catch (error: unknown) {
       toast.error(getErrorMessage(error, 'Gagal logout'));

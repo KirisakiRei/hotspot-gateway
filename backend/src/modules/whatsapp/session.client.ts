@@ -47,7 +47,8 @@ export interface WaSessionClientOptions {
 }
 
 const MAX_RECONNECT_ATTEMPTS = 5;
-const RECONNECT_BASE_DELAY_MS = 5000;
+const RECONNECT_BASE_DELAY_MS = 2000;
+const RESTART_REQUIRED_DELAY_MS = 800;
 
 export class WaSessionClient {
   readonly phone: string;
@@ -65,6 +66,8 @@ export class WaSessionClient {
   private reconnectAttempts = 0;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private closing = false;
+  private starting = false;
+  private socketGeneration = 0;
   private contactCache = new Map<string, { name?: string; notify?: string; verifiedName?: string }>();
 
   constructor(opts: WaSessionClientOptions) {
@@ -109,26 +112,34 @@ export class WaSessionClient {
   // ==========================================
 
   async start(): Promise<void> {
-    if (this.sock) return;
+    if (this.sock || this.starting) return;
+
+    this.starting = true;
+    this.closing = false;
 
     try {
       const { state: authState, saveCreds } = await useMultiFileAuthState(this.authDir);
       const { version } = await fetchLatestBaileysVersion();
 
+      this.setState('CONNECTING');
+      const generation = ++this.socketGeneration;
       this.sock = makeWASocket({
         version,
         auth: authState,
         logger: this.logger,
-        browser: Browsers.ubuntu('MikrotikHotspot'),
+        browser: Browsers.ubuntu('Chrome'),
         markOnlineOnConnect: false,
         printQRInTerminal: false,
+        syncFullHistory: false,
+        connectTimeoutMs: 30_000,
+        defaultQueryTimeoutMs: 30_000,
+        keepAliveIntervalMs: 15_000,
       });
-
-      this.closing = false;
 
       this.sock.ev.on('creds.update', saveCreds);
 
       this.sock.ev.on('connection.update', (update) => {
+        if (generation !== this.socketGeneration) return;
         this.handleConnectionUpdate(update).catch((err) =>
           this.nestLogger.error(`connection.update handler error: ${err.message}`),
         );
@@ -152,28 +163,50 @@ export class WaSessionClient {
       this.setClosureState();
       this.nestLogger.error(`start failed: ${err.message}`);
       throw err;
+    } finally {
+      this.starting = false;
     }
+  }
+
+  /**
+   * Tutup socket lama lalu buat socket baru.
+   * Dipakai setelah scan QR (kode 515) dan saat tombol Connect ditekan ulang.
+   */
+  async restart(): Promise<void> {
+    this.closing = false;
+    this.clearReconnectTimer();
+    await this.endSocket();
+    this.qr = null;
+    this.setState('CONNECTING');
+    await sleep(300);
+    await this.start();
+  }
+
+  /**
+   * Mulai pairing dari UI. Jika sudah CONNECTED, tidak melakukan apa-apa.
+   * Selain itu selalu restart agar QR baru muncul setelah logout/disconnect.
+   */
+  async connect(): Promise<void> {
+    if (this._state === 'CONNECTED') return;
+    this.reconnectAttempts = 0;
+    this.lastError = null;
+    await this.restart();
   }
 
   async stop(): Promise<void> {
     this.closing = true;
     this.clearReconnectTimer();
-    const sock = this.sock;
-    this.sock = null;
-    if (sock) {
-      try {
-        sock.end(undefined);
-      } catch {
-        /* ignore */
-      }
-    }
+    await this.endSocket();
+    this.qr = null;
     this.setClosureState();
+    this.closing = false;
   }
 
   /** Hapus kredensial + tutup socket (logout permanen dari nomor ini). */
   async logout(): Promise<void> {
     this.closing = true;
     this.clearReconnectTimer();
+    this.socketGeneration += 1;
     const sock = this.sock;
     this.sock = null;
     if (sock) {
@@ -182,17 +215,16 @@ export class WaSessionClient {
       } catch {
         /* ignore */
       }
-      try {
-        sock.end(undefined);
-      } catch {
-        /* ignore */
-      }
+      this.disposeSocket(sock);
     }
     this.qr = null;
     this._paired = false;
     this.sentCount = 0;
+    this.reconnectAttempts = 0;
+    this.lastError = null;
     this.setClosureState();
     await rm(this.authDir, { recursive: true, force: true }).catch(() => undefined);
+    this.closing = false;
     this.nestLogger.log('Session logged out, auth removed');
   }
 
@@ -299,7 +331,6 @@ export class WaSessionClient {
     }
 
     if (update.connection === 'connecting') {
-      this.qr = null;
       this.lastError = null;
       this.setState('CONNECTING');
       return;
@@ -321,26 +352,26 @@ export class WaSessionClient {
       const reason = this.describeDisconnect(statusCode);
       this.nestLogger.warn(`Connection closed: ${reason} (code ${statusCode})`);
 
-      // Reset QR saat gagal agar UI tidak menampilkan QR basi
       this.qr = null;
+      await this.endSocket();
 
       if (this.closing) {
         this.setClosureState();
         return;
       }
 
-      // Baileys code 515 (restartRequired): Normal terjadi saat pairing pertama kali / pertukaran kunci selesai.
-      // Cukup reconnect socket tanpa menghapus sesi.
+      // Kode 515: handshake pairing selesai, WhatsApp minta socket baru.
+      // Kredensial sudah tersimpan, jadi restart segera tanpa menghapus auth.
       if (statusCode === DisconnectReason.restartRequired) {
-        this.nestLogger.log('Connection restart requested by WhatsApp server (code 515). Reconnecting...');
-        this.scheduleReconnect();
+        this.nestLogger.log('WhatsApp requested socket restart after pairing (code 515)');
+        this.reconnectAttempts = 0;
+        this.lastError = null;
+        this.scheduleReconnect(RESTART_REQUIRED_DELAY_MS, false);
         return;
       }
 
-      // Kondisi permanen: kredensial tidak valid -> harus scan QR ulang
       const fatalReasons = [
         DisconnectReason.loggedOut,
-        DisconnectReason.timedOut,
         DisconnectReason.badSession,
         DisconnectReason.multideviceMismatch,
       ];
@@ -349,16 +380,17 @@ export class WaSessionClient {
         this.sentCount = 0;
         this.lastError = `Session terminated: ${reason}`;
         this.nestLogger.error(`Permanent disconnect detected. Re-pairing required: ${reason}`);
+        await rm(this.authDir, { recursive: true, force: true }).catch(() => undefined);
         this.setClosureState();
         return;
       }
 
-      // Transient: coba reconnect otomatis (terbatas)
-      if (this.opts.autoReconnect && this._paired) {
+      if (this.opts.autoReconnect) {
         this.scheduleReconnect();
-      } else {
-        this.setClosureState();
+        return;
       }
+
+      this.setClosureState();
     }
   }
 
@@ -385,31 +417,57 @@ export class WaSessionClient {
     }
   }
 
-  private scheduleReconnect(): void {
-    if (this.reconnectTimer) return;
+  private scheduleReconnect(delayMs = RECONNECT_BASE_DELAY_MS, countAttempt = true): void {
+    if (this.reconnectTimer || this.closing) return;
 
-    if (this.reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
-      this.nestLogger.error('Reconnect attempts exhausted, session offline');
-      this.lastError = 'Gagal reconnect setelah beberapa percobaan';
-      this.setClosureState();
-      return;
+    if (countAttempt) {
+      if (this.reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+        this.nestLogger.error('Reconnect attempts exhausted, session offline');
+        this.lastError = 'Gagal reconnect setelah beberapa percobaan';
+        this.setClosureState();
+        return;
+      }
+      this.reconnectAttempts += 1;
+      this.lastError = `Reconnect percobaan ${this.reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS}`;
     }
 
-    this.reconnectAttempts += 1;
-    this.lastError = `Reconnect percobaan ${this.reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS}`;
-    this.nestLogger.log(`Scheduling reconnect attempt ${this.reconnectAttempts}`);
+    this.nestLogger.log(`Scheduling reconnect in ${delayMs}ms`);
+    this.setState('CONNECTING');
 
     this.reconnectTimer = setTimeout(async () => {
       this.reconnectTimer = null;
-      this.setState('CONNECTING');
       try {
-        await this.start();
+        await this.restart();
       } catch (err) {
         this.nestLogger.error(`Reconnect failed: ${err.message}`);
         this.lastError = err.message;
         this.scheduleReconnect();
       }
-    }, RECONNECT_BASE_DELAY_MS);
+    }, delayMs);
+  }
+
+  private async endSocket(): Promise<void> {
+    this.socketGeneration += 1;
+    const sock = this.sock;
+    this.sock = null;
+    if (!sock) return;
+    this.disposeSocket(sock);
+  }
+
+  private disposeSocket(sock: WASocket): void {
+    try {
+      sock.ev.removeAllListeners('connection.update');
+      sock.ev.removeAllListeners('creds.update');
+      sock.ev.removeAllListeners('contacts.upsert');
+      sock.ev.removeAllListeners('messages.upsert');
+    } catch {
+      /* ignore */
+    }
+    try {
+      sock.end(undefined);
+    } catch {
+      /* ignore */
+    }
   }
 
   private clearReconnectTimer(): void {
@@ -458,6 +516,7 @@ export class WaSessionClient {
 
   private setClosureState(): void {
     this.sock = null;
+    this.qr = null;
     this.setState('DISCONNECTED');
   }
 }

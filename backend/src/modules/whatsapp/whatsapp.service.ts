@@ -140,7 +140,7 @@ export class WhatsappService implements OnModuleInit {
       throw new Error('Nomor WhatsApp tidak valid');
     }
 
-    const row = await this.prisma.waSession.upsert({
+    await this.prisma.waSession.upsert({
       where: { phone: normalized },
       create: { phone: normalized, name: name || null },
       update: { name: name || null, active: true },
@@ -171,7 +171,7 @@ export class WhatsappService implements OnModuleInit {
     if (data.active === false) {
       await this.manager.stopSession(normalized);
     } else if (data.active === true) {
-      await this.manager.ensureSession({ phone: normalized, name: row.name });
+      await this.manager.connectSession(normalized);
     }
 
     return (await this.listSessions()).find((s) => s.phone === normalized)!;
@@ -189,7 +189,7 @@ export class WhatsappService implements OnModuleInit {
     const row = await this.prisma.waSession.findUnique({ where: { phone: normalized } });
     if (!row) throw new Error('Sesi tidak ditemukan');
 
-    await this.manager.ensureSession({ phone: normalized, name: row.name });
+    await this.manager.connectSession(normalized);
     return (await this.listSessions()).find((s) => s.phone === normalized)!;
   }
 

@@ -485,7 +485,7 @@ export const whatsappApi = {
   updateSession: (phone: string, data: { name?: string; active?: boolean }) =>
     api.put<ApiResponse<WaSessionInfo>>(`/whatsapp/sessions/${phone}`, data),
   removeSession: (phone: string) => api.delete<ApiResponse>(`/whatsapp/sessions/${phone}`),
-  getQr: (phone: string) => api.get<ApiResponse<{ qr: string }>>(`/whatsapp/sessions/${phone}/qr`),
+  getQr: (phone: string) => api.get<ApiResponse<{ qr: string | null }>>(`/whatsapp/sessions/${phone}/qr`),
   connect: (phone: string) => api.post<ApiResponse<WaSessionInfo>>(`/whatsapp/sessions/${phone}/connect`),
   logout: (phone: string) => api.post<ApiResponse>(`/whatsapp/sessions/${phone}/logout`),
 

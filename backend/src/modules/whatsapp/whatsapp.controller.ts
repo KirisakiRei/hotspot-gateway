@@ -3,7 +3,6 @@
 // ==========================================
 
 import {
-  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -115,10 +114,7 @@ export class WhatsappController {
   @Roles('SUPER_ADMIN', 'ADMIN')
   async getQr(@Param('phone') phone: string) {
     const qr = await this.whatsappService.getQr(phone);
-    if (!qr) {
-      throw new BadRequestException('QR tidak tersedia (sesi belum dalam mode pairing)');
-    }
-    return ok({ qr });
+    return ok({ qr: qr || null });
   }
 
   @Post('sessions/:phone/connect')
