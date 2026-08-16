@@ -159,6 +159,7 @@ export interface Advertisement {
 export interface TrackAdRequest {
   userId?: string;
   deviceId?: string;
+  watchTime?: number;
 }
 
 export const advertisementApi = {
@@ -171,7 +172,7 @@ export const advertisementApi = {
   create: (data: Partial<Advertisement>) => api.post<ApiResponse<Advertisement>>('/advertisements', data),
   update: (id: string, data: Partial<Advertisement>) => api.patch<ApiResponse<Advertisement>>(`/advertisements/${id}`, data),
   delete: (id: string) => api.delete<ApiResponse>(`/advertisements/${id}`),
-  upload: (formData: FormData) => api.post<ApiResponse<{ filename: string; videoUrl: string; size: number }>>('/advertisements/upload', formData, {
+  upload: (formData: FormData) => api.post<ApiResponse<{ filename: string; videoUrl: string; size: number; posterUrl?: string | null; duration?: number; transcoded?: boolean }>>('/advertisements/upload', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
     timeout: TIMEOUTS.VERY_SLOW,
   }),

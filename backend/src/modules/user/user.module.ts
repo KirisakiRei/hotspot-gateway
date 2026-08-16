@@ -2,10 +2,10 @@ import { Module } from '@nestjs/common';
 import { UserController } from './user.controller';
 import { UserService } from './user.service';
 import { PrismaService } from '@/common/prisma.service';
-import { MikrotikModule } from '@/modules/mikrotik/mikrotik.module';
+import { SessionModule } from '@/modules/session/session.module';
 
 @Module({
-  imports: [MikrotikModule],
+  imports: [SessionModule],
   controllers: [UserController],
   providers: [UserService, PrismaService],
   exports: [UserService],

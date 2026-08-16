@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
-import { advertisementApi, voucherApi, type Advertisement, type Voucher, type SessionInfo, handleApiError } from '@/services/api';
+import { advertisementApi, voucherApi, type Advertisement, type Voucher, type SessionInfo, type TrackAdRequest, handleApiError } from '@/services/api';
 import { useToast } from '@/hooks/use-toast';
 
 export type PortalStep = 'video' | 'form' | 'voucher' | 'success' | 'connected';
@@ -78,7 +78,7 @@ interface PortalContextType {
   setAgreedToTerms: (agreed: boolean) => void;
   loadAdvertisement: () => Promise<void>;
   trackAdView: () => Promise<void>;
-  trackAdComplete: () => Promise<void>;
+  trackAdComplete: (watchTime?: number) => Promise<void>;
   trackAdSkip: () => Promise<void>;
   requestVoucher: () => Promise<void>;
   resendVoucher: () => Promise<void>;
@@ -372,11 +372,17 @@ export function PortalProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const trackAdComplete = async () => {
+  const trackAdComplete = async (watchTime?: number) => {
     if (!state.advertisement) return;
     
     try {
-      await advertisementApi.trackComplete(state.advertisement.id, { deviceId: state.deviceInfo.mac });
+      const payload: TrackAdRequest = { deviceId: state.deviceInfo.mac };
+      if (typeof watchTime === 'number' && Number.isFinite(watchTime)) {
+        payload.watchTime = Math.max(0, Math.round(watchTime));
+      } else {
+        payload.watchTime = 0;
+      }
+      await advertisementApi.trackComplete(state.advertisement.id, payload);
     } catch (error) {
       console.error('Failed to track ad completion:', error);
     }

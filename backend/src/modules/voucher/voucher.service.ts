@@ -16,6 +16,7 @@ import { GenerateVoucherDto, RedeemVoucherDto } from './dto/voucher.dto';
 import { Prisma, Voucher, VoucherProfile, VoucherStatus } from '@prisma/client';
 import { WhatsappService } from '@/modules/whatsapp/whatsapp.service';
 import { MikrotikService } from '@/modules/mikrotik/mikrotik.service';
+import { SessionService } from '@/modules/session/session.service';
 import { normalizeMac } from '@/common/utils/mac';
 import { getErrorMessage, getPrismaUniqueTarget, isPrismaUniqueViolation } from '@/common/utils/error';
 import * as crypto from 'crypto';
@@ -29,6 +30,7 @@ export class VoucherService {
     @Inject(forwardRef(() => WhatsappService))
     private whatsappService: WhatsappService,
     private mikrotikService: MikrotikService,
+    private sessionService: SessionService,
   ) {}
 
   // ==========================================
@@ -623,13 +625,13 @@ export class VoucherService {
             );
 
             // Strategy: Force override - kick the old user from this device
-            // 1. Disconnect old user's active session in Mikrotik
+            // 1. Disconnect old user's active session in Mikrotik & close DB session
             try {
-              await this.mikrotikService.disconnectUserByMac(macAddress);
-              this.logger.log(`Disconnected previous session from Mikrotik for MAC ${macAddress}`);
+              await this.sessionService.kickSession(macAddress);
+              this.logger.log(`Disconnected previous session from Mikrotik & closed DB session for MAC ${macAddress}`);
             } catch (error: unknown) {
               const msg = error instanceof Error ? error.message : String(error);
-              this.logger.warn(`Failed to disconnect previous session from Mikrotik: ${msg}`);
+              this.logger.warn(`Failed to disconnect previous session: ${msg}`);
             }
 
             // 2. Clear the MAC from the conflicting user (set to null)
@@ -836,7 +838,7 @@ export class VoucherService {
       });
       
       this.logger.log(
-        `✅ Added user ${voucher.code} to Mikrotik hotspot with profile: ${voucher.profile.name}`,
+        `Added user ${voucher.code} to Mikrotik hotspot with profile: ${voucher.profile.name}`,
       );
     } catch (mikrotikError: unknown) {
       this.logger.warn(`Failed to add user to Mikrotik router: ${getErrorMessage(mikrotikError)}`);
@@ -996,6 +998,7 @@ export class VoucherService {
     // 5. Create or update Mikrotik hotspot user with correct profile
     this.logger.log(`Authenticating voucher: ${voucher.code}, profile: ${voucher.profile.name}`);
     
+    let loginUrl: string | undefined;
     try {
       // First, create/update the hotspot user with the correct profile
       this.logger.log(`Configuring hotspot user on router: ${voucher.code} (profile: ${voucher.profile.name})`);
@@ -1031,7 +1034,7 @@ export class VoucherService {
       );
       
       // Store loginUrl for later use
-      var loginUrl = authResult.loginUrl;
+      loginUrl = authResult.loginUrl;
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : String(error);
       this.logger.error(`Failed to create Mikrotik session: ${msg}`);
@@ -1249,14 +1252,13 @@ export class VoucherService {
    * Used by portal logout functionality
    */
   async disconnectSession(mac: string) {
-    // 1. Disconnect from Mikrotik
+    // 1. Unified kick via SessionService (Router + DB close)
     try {
-      await this.mikrotikService.disconnectUserByMac(mac);
-      this.logger.log(`Disconnected MAC from router: ${mac}`);
+      await this.sessionService.kickSession(mac);
+      this.logger.log(`Disconnected and closed session for MAC: ${mac}`);
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : String(error);
-      this.logger.error(`Failed to disconnect MAC ${mac} from Mikrotik: ${msg}`);
-      // Continue anyway to log the disconnect attempt
+      this.logger.error(`Failed to disconnect MAC ${mac}: ${msg}`);
     }
 
     // 2. Log disconnect action

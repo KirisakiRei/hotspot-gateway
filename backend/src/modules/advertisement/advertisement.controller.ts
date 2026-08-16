@@ -14,10 +14,11 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
-import { extname, join } from 'path';
+import { basename, extname, join } from 'path';
 import type { Request } from 'express';
 import { existsSync, mkdirSync } from 'fs';
 import { AdvertisementService } from './advertisement.service';
+import { VideoMediaService } from './video-media.service';
 import { CreateAdvertisementDto } from './dto/create-advertisement.dto';
 import { UpdateAdvertisementDto } from './dto/update-advertisement.dto';
 import { TrackViewDto, TrackCompletionDto } from './dto/track.dto';
@@ -34,7 +35,10 @@ if (!existsSync(uploadDir)) {
 
 @Controller('advertisements')
 export class AdvertisementController {
-  constructor(private readonly advertisementService: AdvertisementService) {}
+  constructor(
+    private readonly advertisementService: AdvertisementService,
+    private readonly videoMediaService: VideoMediaService,
+  ) {}
 
   // Upload video file
   @Post('upload')
@@ -55,24 +59,29 @@ export class AdvertisementController {
         if (allowedMimes.includes(file.mimetype)) {
           cb(null, true);
         } else {
-          cb(new Error('Only MP4, WebM, OGG video files are allowed'), false);
+          cb(new Error('Hanya format MP4, WebM, dan OGG yang didukung'), false);
         }
       },
       limits: {
-        fileSize: 100 * 1024 * 1024, // 100MB max
+        fileSize: 100 * 1024 * 1024, // 100MB max upload mentah
       },
     }),
   )
   async uploadVideo(@UploadedFile() file: Express.Multer.File) {
     if (!file) {
-      throw new BadRequestException('No video file uploaded');
+      throw new BadRequestException('File video tidak ditemukan');
     }
-    
-    return ApiResponseDto.success('Video uploaded successfully', {
-      filename: file.filename,
+
+    const processed = await this.videoMediaService.processUpload(file.path);
+
+    return ApiResponseDto.success('Video berhasil diupload dan diproses', {
+      filename: basename(processed.videoUrl),
       originalName: file.originalname,
-      size: file.size,
-      videoUrl: `/videos/${file.filename}`,
+      size: processed.size,
+      duration: processed.duration,
+      transcoded: processed.transcoded,
+      posterUrl: processed.posterUrl,
+      videoUrl: processed.videoUrl,
     });
   }
 

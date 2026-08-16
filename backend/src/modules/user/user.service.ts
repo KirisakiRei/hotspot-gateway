@@ -1,23 +1,31 @@
 import { Injectable, NotFoundException, Logger } from '@nestjs/common';
 import { PrismaService } from '@/common/prisma.service';
 import { UserStatus, Prisma, LogType, type User } from '@prisma/client';
-import { MikrotikService } from '@/modules/mikrotik/mikrotik.service';
+import { SessionService } from '@/modules/session/session.service';
 import { getErrorMessage } from '@/common/utils/error';
-import type { HotspotSessionRecord } from '@/modules/mikrotik/mikrotik.types';
+
+type UserWithSessionRelation = User & {
+  sessions?: Array<{
+    bytesIn: bigint;
+    bytesOut: bigint;
+    ipAddress: string | null;
+    server: string | null;
+  }>;
+};
 
 @Injectable()
 export class UserService {
   private readonly logger = new Logger(UserService.name);
-  
+
   constructor(
-    private prisma: PrismaService,
-    private mikrotikService: MikrotikService,
+    private readonly prisma: PrismaService,
+    private readonly sessionService: SessionService,
   ) {}
 
   /**
-   * Get all users with real-time Mikrotik sync
-   * This combines database users with Mikrotik active sessions
-   * OPTIMIZED: Single Mikrotik query for both sync and enrich operations
+   * Mengambil seluruh data user dari database (read-mostly).
+   * Status online/offline dan statistik bytes disinkronkan secara kontinu
+   * oleh SessionService via event /listen MikroTik.
    */
   async findAll(filters?: {
     status?: UserStatus;
@@ -26,12 +34,6 @@ export class UserService {
     limit?: number;
   }) {
     const { status, search, page = 1, limit = 20 } = filters || {};
-    
-    // OPTIMIZATION: Get active sessions ONCE and reuse for sync + enrich
-    const activeSessions = await this.mikrotikService.getActiveSessions();
-    
-    // Sync online status using the fetched sessions (no additional Mikrotik query)
-    await this.syncOnlineStatusFromMikrotik(activeSessions);
 
     const where: Prisma.UserWhereInput = {};
 
@@ -51,7 +53,6 @@ export class UserService {
 
     const skip = (page - 1) * limit;
 
-    // Get users from database with full relations
     const [users, total] = await Promise.all([
       this.prisma.user.findMany({
         where,
@@ -77,8 +78,7 @@ export class UserService {
       this.prisma.user.count({ where }),
     ]);
 
-    // Enrich with Mikrotik live data (reuse fetched sessions, no additional query)
-    const enrichedUsers = this.enrichUsersWithMikrotikData(users, activeSessions);
+    const enrichedUsers = users.map((user) => this.enrichUserFromDbSession(user));
 
     return {
       data: enrichedUsers,
@@ -91,128 +91,34 @@ export class UserService {
     };
   }
 
-  /**
-   * Sync online status from Mikrotik active sessions
-   * Update database status for users that are/aren't online
-   * OPTIMIZED: Accept activeSessions as parameter to avoid duplicate query
-   */
-  private async syncOnlineStatusFromMikrotik(activeSessions?: HotspotSessionRecord[]) {
-    try {
-      // If not provided, fetch from Mikrotik (for standalone calls)
-      const sessions = activeSessions ?? await this.mikrotikService.getActiveSessions();
-      this.logger.log(`Synchronizing ${sessions.length} active sessions from Mikrotik`);
+  private enrichUserFromDbSession(user: UserWithSessionRelation) {
+    const session = user.sessions?.[0];
 
-      // Get all MAC addresses from active sessions
-      const activeMacs = sessions
-        .map(s => s.mac || s['mac-address'])
-        .filter(Boolean)
-        .map(mac => mac.toUpperCase());
+    if (user.status === 'ONLINE' && session) {
+      const bytesIn = Number(session.bytesIn ?? 0);
+      const bytesOut = Number(session.bytesOut ?? 0);
+      const totalBytes = bytesIn + bytesOut;
 
-      if (activeMacs.length > 0) {
-        // Set users with active sessions to ONLINE
-        await this.prisma.user.updateMany({
-          where: {
-            macAddress: { in: activeMacs },
-            status: { not: 'BLOCKED' }, // Don't update blocked users
-          },
-          data: { status: 'ONLINE' },
-        });
-
-        // Set users without active sessions to OFFLINE (except blocked)
-        await this.prisma.user.updateMany({
-          where: {
-            macAddress: { notIn: activeMacs },
-            status: 'ONLINE',
-          },
-          data: { status: 'OFFLINE' },
-        });
-      } else {
-        // No active sessions, set all ONLINE users to OFFLINE
-        await this.prisma.user.updateMany({
-          where: { status: 'ONLINE' },
-          data: { status: 'OFFLINE' },
-        });
-      }
-    } catch (error) {
-      this.logger.error(`Failed to synchronize Mikrotik status: ${getErrorMessage(error)}`);
+      return {
+        ...user,
+        ipAddress: session.ipAddress || user.ipAddress,
+        server: session.server || user.server || 'hotspot1',
+        uptime: null,
+        bytesIn,
+        bytesOut,
+        sessionTime: null,
+        quotaUsed: BigInt(totalBytes),
+      };
     }
-  }
 
-  /**
-   * Enrich user data with live Mikrotik session info
-   * OPTIMIZED: Accept activeSessions as parameter to avoid duplicate query
-   */
-  private enrichUsersWithMikrotikData(users: User[], activeSessions: HotspotSessionRecord[]) {
-    try {
-      return users.map(user => {
-        const session = activeSessions.find(s => {
-          const sessionMac = String(s.mac || s['mac-address'] || '').toUpperCase();
-          const userMac = (user.macAddress || '').toUpperCase();
-          return sessionMac === userMac;
-        });
-
-        if (session) {
-          const bytesIn = this.parseBytes(String(session['bytes-in'] ?? session.bytesIn ?? '0'));
-          const bytesOut = this.parseBytes(String(session['bytes-out'] ?? session.bytesOut ?? '0'));
-          
-          return {
-            ...user,
-            status: 'ONLINE',
-            ipAddress: session.address || session.ip || user.ipAddress,
-            // Real-time session data from Mikrotik
-            uptime: session.uptime || session['session-time-left'] || null,
-            bytesIn,
-            bytesOut,
-            sessionTime: session['session-time-left'] || session.uptime || null,
-            server: session.server || 'hotspot1',
-            // Format for display
-            quotaUsed: BigInt(bytesIn + bytesOut),
-            username: session.user || session.username,
-          };
-        }
-
-        return {
-          ...user,
-          uptime: null,
-          bytesIn: 0,
-          bytesOut: 0,
-          sessionTime: null,
-          quotaUsed: BigInt(0),
-        };
-      });
-    } catch (error) {
-      this.logger.error(`Failed to enrich users with session data: ${getErrorMessage(error)}`);
-      return users;
-    }
-  }
-
-  /**
-   * Parse bytes from Mikrotik format (e.g. "1.2MiB", "500KiB", "1234")
-   */
-  private parseBytes(value: string | number): number {
-    if (typeof value === 'number') return value;
-    if (!value) return 0;
-    
-    const str = value.toString();
-    const match = str.match(/^([\d.]+)\s*(KiB|MiB|GiB|K|M|G|B)?$/i);
-    if (!match) return parseInt(str) || 0;
-    
-    const num = parseFloat(match[1]);
-    const unit = (match[2] || '').toUpperCase();
-    
-    switch (unit) {
-      case 'KIB':
-      case 'K':
-        return Math.round(num * 1024);
-      case 'MIB':
-      case 'M':
-        return Math.round(num * 1024 * 1024);
-      case 'GIB':
-      case 'G':
-        return Math.round(num * 1024 * 1024 * 1024);
-      default:
-        return Math.round(num);
-    }
+    return {
+      ...user,
+      uptime: null,
+      bytesIn: 0,
+      bytesOut: 0,
+      sessionTime: null,
+      quotaUsed: BigInt(0),
+    };
   }
 
   async findById(id: string) {
@@ -237,90 +143,50 @@ export class UserService {
     return user;
   }
 
+  /**
+   * Mengambil daftar user ONLINE dari database
+   */
   async findOnlineUsers() {
-    try {
-      // Get active sessions directly from Mikrotik (source of truth)
-      const activeSessions = await this.mikrotikService.getActiveSessions();
-      this.logger.log(`Found ${activeSessions.length} active sessions in Mikrotik`);
-
-      // Get MAC addresses
-      const macAddresses = activeSessions
-        .map(s => s.mac || s['mac-address'])
-        .filter(Boolean)
-        .map(mac => mac.toUpperCase());
-
-      if (macAddresses.length === 0) {
-        return [];
-      }
-      
-      // Get users from database that match active sessions
-      const users = await this.prisma.user.findMany({
-        where: {
-          macAddress: { in: macAddresses },
-        },
-        include: {
-          voucher: {
-            include: {
-              profile: true,
-            },
-          },
-          sessions: {
-            where: { endedAt: null },
-            orderBy: { startedAt: 'desc' },
-            take: 1,
+    const users = await this.prisma.user.findMany({
+      where: { status: 'ONLINE' },
+      include: {
+        voucher: {
+          include: {
+            profile: true,
           },
         },
-        orderBy: { loginAt: 'desc' },
-      });
+        sessions: {
+          where: { endedAt: null },
+          orderBy: { startedAt: 'desc' },
+          take: 1,
+        },
+      },
+      orderBy: { loginAt: 'desc' },
+    });
 
-      // Enrich with live Mikrotik data (reuse the activeSessions we already have)
-      return this.enrichUsersWithMikrotikData(users, activeSessions);
-    } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : String(error);
-      this.logger.error(`Failed to fetch online users from Mikrotik: ${message}`);
-      return [];
-    }
+    return users.map((user) => this.enrichUserFromDbSession(user));
   }
 
   /**
-   * Kick user from Mikrotik (disconnect active session)
+   * Kick user secara terpadu (Router + DB close)
    */
   async kickUser(id: string) {
     const user = await this.findById(id);
-    
+
     if (!user.macAddress) {
-      throw new NotFoundException('User has no MAC address');
+      throw new NotFoundException('User tidak memiliki MAC address');
     }
 
     try {
-      // Get active session from Mikrotik by MAC
-      const sessions = await this.mikrotikService.getActiveSessions();
-      const session = sessions.find(s => {
-        const sessionMac = (s.mac || s['mac-address'] || '').toUpperCase();
-        return sessionMac === user.macAddress?.toUpperCase();
-      });
+      await this.sessionService.kickSession(user.macAddress);
+      this.logger.log(`User ${user.phone} (MAC: ${user.macAddress}) berhasil di-kick`);
 
-      if (session) {
-        // Disconnect user by username
-        const username = session.user || session.username;
-        if (username) {
-          await this.mikrotikService.disconnectUser(username);
-          this.logger.log(`Disconnected user ${username} (MAC: ${user.macAddress})`);
-        }
-      }
-
-      // Update user status
-      await this.prisma.user.update({
-        where: { id },
-        data: { status: 'OFFLINE' },
-      });
-
-      // Log action
+      // Catat ke system log
       await this.prisma.systemLog.create({
         data: {
           action: 'USER_KICKED',
           type: LogType.ADMIN,
-          description: `User ${user.phone} kicked`,
+          description: `User ${user.phone} di-kick oleh admin`,
           metadata: {
             phone: user.phone,
             macAddress: user.macAddress,
@@ -331,8 +197,7 @@ export class UserService {
 
       return { message: 'User disconnected successfully' };
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : String(error);
-      this.logger.error(`Failed to disconnect user: ${message}`);
+      this.logger.error(`Gagal melakukan kick user: ${getErrorMessage(error)}`);
       throw error;
     }
   }
@@ -340,20 +205,29 @@ export class UserService {
   async blockUser(id: string, reason?: string) {
     const user = await this.findById(id);
 
-    // Block user
+    // Bila ada MAC aktif, kick terlebih dahulu
+    if (user.macAddress) {
+      try {
+        await this.sessionService.kickSession(user.macAddress);
+      } catch (error) {
+        this.logger.warn(`Kick saat block gagal untuk MAC ${user.macAddress}: ${getErrorMessage(error)}`);
+      }
+    }
+
     const updated = await this.prisma.user.update({
       where: { id },
       data: {
         status: 'BLOCKED',
+        isBlocked: true,
+        blockReason: reason,
       },
     });
 
-    // Log action
     await this.prisma.systemLog.create({
       data: {
         action: 'USER_BLOCKED',
         type: LogType.ADMIN,
-        description: `User ${user.phone} blocked`,
+        description: `User ${user.phone} diblokir`,
         metadata: {
           phone: user.phone,
           macAddress: user.macAddress,
@@ -373,15 +247,16 @@ export class UserService {
       where: { id },
       data: {
         status: 'OFFLINE',
+        isBlocked: false,
+        blockReason: null,
       },
     });
 
-    // Log action
     await this.prisma.systemLog.create({
       data: {
         action: 'USER_UNBLOCKED',
         type: LogType.ADMIN,
-        description: `User ${user.phone} unblocked`,
+        description: `User ${user.phone} dibuka blokirnya`,
         metadata: {
           phone: user.phone,
           macAddress: user.macAddress,
@@ -396,22 +271,29 @@ export class UserService {
   async deleteUser(id: string) {
     const user = await this.findById(id);
 
-    // Delete sessions first (foreign key constraint)
+    // Kick aktif bila ada
+    if (user.macAddress) {
+      try {
+        await this.sessionService.kickSession(user.macAddress);
+      } catch (error) {
+        this.logger.warn(`Kick saat hapus user gagal: ${getErrorMessage(error)}`);
+      }
+    }
+
+    // Hapus sesi terkait
     await this.prisma.session.deleteMany({
       where: { userId: id },
     });
 
-    // Delete user
     await this.prisma.user.delete({
       where: { id },
     });
 
-    // Log action
     await this.prisma.systemLog.create({
       data: {
         action: 'USER_DELETED',
         type: LogType.ADMIN,
-        description: `User ${user.phone} deleted`,
+        description: `User ${user.phone} dihapus`,
         metadata: {
           phone: user.phone,
           macAddress: user.macAddress,

@@ -19,6 +19,7 @@ export default function AdminAds() {
   const [editingAd, setEditingAd] = useState<Advertisement | null>(null);
   const [videoType, setVideoType] = useState<VideoType>('LOCAL');
   const [uploadedVideoUrl, setUploadedVideoUrl] = useState<string>('');
+  const [uploadedPosterUrl, setUploadedPosterUrl] = useState<string>('');
   const [videoDuration, setVideoDuration] = useState<number>(0);
   const videoPreviewRef = useRef<HTMLVideoElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -76,10 +77,25 @@ export default function AdminAds() {
       formDataUpload.append('video', file);
 
       const response = await advertisementApi.upload(formDataUpload);
-      const { videoUrl, filename } = response.data.data!;
+      const { videoUrl, filename, posterUrl, duration } = response.data.data!;
 
       setUploadedVideoUrl(videoUrl);
-      setFormData(prev => ({ ...prev, videoUrl }));
+      if (posterUrl) {
+        setUploadedPosterUrl(posterUrl);
+      }
+      if (duration && duration > 0) {
+        setVideoDuration(duration);
+        setFormData(prev => ({
+          ...prev,
+          videoUrl,
+          duration,
+          endTime: duration,
+          displayDuration: duration,
+          skipAfter: Math.min(prev.skipAfter, Math.max(1, duration - 1)),
+        }));
+      } else {
+        setFormData(prev => ({ ...prev, videoUrl }));
+      }
       toast.success(`Video "${filename}" berhasil diupload`);
     } catch (error: unknown) {
       toast.error(getErrorMessage(error, 'Gagal mengupload video'));
@@ -88,35 +104,35 @@ export default function AdminAds() {
     }
   };
 
-  // Detect video duration when video loads
+  // Detect video duration when video loads (maksimal 60 detik)
   const handleVideoLoadedMetadata = () => {
     if (videoPreviewRef.current) {
-      const duration = Math.floor(videoPreviewRef.current.duration);
+      const rawDuration = Math.floor(videoPreviewRef.current.duration) || 0;
+      const duration = Math.min(rawDuration, 60);
       setVideoDuration(duration);
       
-      // Auto-set duration and endTime to match video
+      // Auto-set duration and endTime to match video (maks 60 detik)
       setFormData(prev => ({
         ...prev,
-        duration: duration,
-        endTime: duration,
-        displayDuration: duration,
-        // Ensure skipAfter doesn't exceed duration
-        skipAfter: Math.min(prev.skipAfter, duration - 1),
+        duration: duration > 0 ? duration : 15,
+        endTime: duration > 0 ? duration : 15,
+        displayDuration: duration > 0 ? duration : 15,
+        skipAfter: Math.min(prev.skipAfter, Math.max(1, (duration || 15) - 1)),
       }));
     }
   };
 
   const handleDurationChange = (value: number) => {
-    // Can't exceed actual video duration
-    const maxDuration = videoDuration > 0 ? videoDuration : 300;
-    const newDuration = Math.min(value, maxDuration);
+    // Can't exceed actual video duration, maksimal 60 detik
+    const maxDuration = videoDuration > 0 ? Math.min(videoDuration, 60) : 60;
+    const newDuration = Math.max(5, Math.min(value, maxDuration));
     
     setFormData(prev => ({
       ...prev,
       duration: newDuration,
       endTime: newDuration,
       displayDuration: newDuration,
-      skipAfter: Math.min(prev.skipAfter, newDuration - 1),
+      skipAfter: Math.min(prev.skipAfter, Math.max(1, newDuration - 1)),
     }));
   };
 
@@ -139,7 +155,7 @@ export default function AdminAds() {
         ...formData,
         videoType: 'LOCAL' as const,
         videoUrl: uploadedVideoUrl || editingAd?.videoUrl,
-        thumbnailUrl: null,
+        thumbnailUrl: uploadedPosterUrl || editingAd?.thumbnailUrl || null,
       };
 
       if (editingAd) {
@@ -189,6 +205,7 @@ export default function AdminAds() {
     setEditingAd(null);
     setVideoType('LOCAL');
     setUploadedVideoUrl('');
+    setUploadedPosterUrl('');
     setVideoDuration(0);
     setFormData({
       title: '',
@@ -211,6 +228,7 @@ export default function AdminAds() {
     setEditingAd(ad);
     setVideoType('LOCAL');
     setUploadedVideoUrl(ad.videoUrl.startsWith('/videos/') ? ad.videoUrl : '');
+    setUploadedPosterUrl(ad.thumbnailUrl || '');
     setVideoDuration(ad.duration);
     setFormData({
       title: ad.title,
@@ -238,6 +256,7 @@ export default function AdminAds() {
     setModalType(null);
     setEditingAd(null);
     setUploadedVideoUrl('');
+    setUploadedPosterUrl('');
     setVideoDuration(0);
   };
 
@@ -507,7 +526,7 @@ export default function AdminAds() {
                         <>
                           <Upload className="w-8 h-8 text-muted-foreground" />
                           <span className="text-sm text-muted-foreground">Klik untuk upload video</span>
-                          <span className="text-xs text-muted-foreground">MP4, WebM, OGG - Maksimal 100MB</span>
+                          <span className="text-xs text-muted-foreground">MP4, WebM, OGG · Maksimal 60 detik (100MB)</span>
                         </>
                       )}
                     </button>
@@ -518,6 +537,7 @@ export default function AdminAds() {
                         <video
                           ref={videoPreviewRef}
                           src={getVideoPreviewUrl()}
+                          poster={uploadedPosterUrl || editingAd?.thumbnailUrl || undefined}
                           className="w-full h-48 object-contain"
                           controls
                           onLoadedMetadata={handleVideoLoadedMetadata}
@@ -562,7 +582,7 @@ export default function AdminAds() {
                       onChange={(e) => handleDurationChange(parseInt(e.target.value) || 5)}
                       className="w-full px-4 py-2.5 border border-border rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent bg-background"
                       min="5"
-                      max={videoDuration > 0 ? videoDuration : 300}
+                      max={videoDuration > 0 ? Math.min(videoDuration, 60) : 60}
                       required
                     />
                     {videoDuration > 0 && (

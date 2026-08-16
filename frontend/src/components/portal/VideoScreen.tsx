@@ -2,37 +2,73 @@ import { useState, useEffect, useRef } from 'react';
 import { Play, Volume2, VolumeX, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
 import { usePortal } from '@/contexts/PortalContext';
 
+// Timeout maksimal buffering sebelum tombol lewati darurat dibuka (12 detik)
+const BUFFER_STALL_TIMEOUT_MS = 12000;
+
 export function VideoScreen() {
   const { state, setStep, trackAdView, trackAdComplete, trackAdSkip, loadAdvertisement, checkSession } = usePortal();
   const { advertisement, loading, error } = state;
   const [checkingSession, setCheckingSession] = useState(false);
   
   const [isPlaying, setIsPlaying] = useState(false);
+  const [isBuffering, setIsBuffering] = useState(false);
   const [isMuted, setIsMuted] = useState(true);
+  const [videoEnded, setVideoEnded] = useState(false);
+  const [videoError, setVideoError] = useState<string | null>(null);
+  const [stallBypass, setStallBypass] = useState(false);
   const [countdown, setCountdown] = useState(0);
   const [progress, setProgress] = useState(0);
+
   const videoRef = useRef<HTMLVideoElement>(null);
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const stallTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hasTrackedView = useRef(false);
 
   const skipAfter = advertisement?.skipAfter || 5;
-  const isSkipable = advertisement?.skipable || false;
-  const canSkip = isSkipable && countdown <= 0;
+  const isSkipable = advertisement?.skipable ?? true;
 
-  // Initialize countdown when advertisement loads
+  // Tombol terbuka bila hitungan selesai (pada skipable) ATAU video tamat ATAU error ATAU buffer stall
+  const forceUnlocked = videoEnded || !!videoError || stallBypass;
+  const canSkip = (isSkipable && countdown <= 0) || forceUnlocked;
+
+  const clearStallTimeout = () => {
+    if (stallTimeoutRef.current) {
+      clearTimeout(stallTimeoutRef.current);
+      stallTimeoutRef.current = null;
+    }
+  };
+
+  const startStallTimeout = () => {
+    clearStallTimeout();
+    stallTimeoutRef.current = setTimeout(() => {
+      setStallBypass(true);
+      setCountdown(0);
+    }, BUFFER_STALL_TIMEOUT_MS);
+  };
+
+  // Inisialisasi countdown saat iklan termuat
   useEffect(() => {
     if (advertisement) {
       setCountdown(skipAfter);
+      setProgress(0);
+      setVideoEnded(false);
+      setVideoError(null);
+      setStallBypass(false);
+      setIsBuffering(false);
+      setIsPlaying(false);
+      clearStallTimeout();
     }
   }, [advertisement, skipAfter]);
 
+  // Interval timer — HANYA jalan saat video benar-benar memutar dan tidak sedang buffering
   useEffect(() => {
-    if (isPlaying && countdown > 0) {
+    if (isPlaying && !isBuffering && countdown > 0) {
       intervalRef.current = setInterval(() => {
-        setCountdown(prev => {
-          const newValue = prev - 1;
-          setProgress(((skipAfter - newValue) / skipAfter) * 100);
-          return newValue;
+        setCountdown((prev) => {
+          const next = prev - 1;
+          const calculatedProgress = skipAfter > 0 ? ((skipAfter - next) / skipAfter) * 100 : 100;
+          setProgress(Math.min(100, Math.max(0, calculatedProgress)));
+          return next;
         });
       }, 1000);
     }
@@ -40,20 +76,62 @@ export function VideoScreen() {
     return () => {
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
+        intervalRef.current = null;
       }
     };
-  }, [isPlaying, skipAfter]);
+  }, [isPlaying, isBuffering, skipAfter]);
 
   useEffect(() => {
     if (countdown <= 0 && intervalRef.current) {
       clearInterval(intervalRef.current);
+      intervalRef.current = null;
     }
   }, [countdown]);
 
+  useEffect(() => {
+    return () => {
+      clearStallTimeout();
+    };
+  }, []);
+
+  const handlePlaying = () => {
+    clearStallTimeout();
+    setIsBuffering(false);
+    setIsPlaying(true);
+  };
+
+  const handleWaiting = () => {
+    setIsPlaying(false);
+    setIsBuffering(true);
+    startStallTimeout();
+  };
+
+  const handlePause = () => {
+    setIsPlaying(false);
+  };
+
+  const handleVideoEnded = () => {
+    clearStallTimeout();
+    setIsPlaying(false);
+    setIsBuffering(false);
+    setVideoEnded(true);
+    setCountdown(0);
+  };
+
+  const handleVideoError = () => {
+    clearStallTimeout();
+    setIsPlaying(false);
+    setIsBuffering(false);
+    setVideoError('Video gagal diputar. Silakan lanjutkan.');
+    setCountdown(0);
+  };
+
   const handlePlay = () => {
     if (videoRef.current) {
-      videoRef.current.play();
-      setIsPlaying(true);
+      videoRef.current.play().catch(() => {
+        setVideoError('Autoplay tidak didukung. Silakan lanjutkan.');
+        setCountdown(0);
+      });
     }
   };
 
@@ -64,66 +142,49 @@ export function VideoScreen() {
     }
   };
 
-  const handleVideoEnded = () => {
-    setCountdown(0);
-    // Don't track completion here, it will be tracked on handleNext
-  };
-
   const handleNext = async () => {
     if (canSkip && !checkingSession) {
-      // Track view when user clicks "Lanjutkan" - this means they saw the ad
       if (!hasTrackedView.current) {
         trackAdView();
         hasTrackedView.current = true;
       }
-      
-      // Track completion or skip based on video state
-      if (videoRef.current && !videoRef.current.ended) {
-        // Video didn't finish - track as skip
+
+      if (videoRef.current && !videoRef.current.ended && !videoEnded) {
         trackAdSkip();
       } else {
-        // Video finished or YouTube - track as completion
-        trackAdComplete();
+        const watchTime = Math.round(videoRef.current?.currentTime || 0);
+        trackAdComplete(watchTime);
       }
 
-      // Check if user already has active session (returning user)
       const mac = state.deviceInfo.mac;
       if (mac) {
         try {
           setCheckingSession(true);
           const sessionCache = localStorage.getItem('portal_session_cache');
-          
-          // Quick check from cache first
+
           if (sessionCache) {
             const cached = JSON.parse(sessionCache);
             const cacheAge = Date.now() - cached.timestamp;
-            // Cache valid for 30 seconds
             if (cacheAge < 30000 && cached.active && cached.mac === mac) {
-              console.log('✅ User has cached active session - skip to connected');
               setStep('connected');
               setCheckingSession(false);
               return;
             }
           }
 
-          // Check with backend via Mikrotik active users
           await checkSession();
-          
-          // If checkSession updates state to 'connected', component will re-render
-          // Otherwise continue to form
+
           setTimeout(() => {
             if (state.currentStep !== 'connected') {
               setStep('form');
             }
             setCheckingSession(false);
           }, 500);
-        } catch (error) {
-          console.error('Session check failed, continue to form:', error);
+        } catch {
           setStep('form');
           setCheckingSession(false);
         }
       } else {
-        // No MAC - proceed to form
         setStep('form');
       }
     }
@@ -131,12 +192,11 @@ export function VideoScreen() {
 
   const getVideoUrl = () => advertisement?.videoUrl || '';
 
-  // Handle skip when no ad or error - go directly to form
   const handleSkipNoAd = () => {
     setStep('form');
   };
 
-  // Loading state
+  // Loading state dari API
   if (loading) {
     return (
       <div className="fixed inset-0 bg-black flex items-center justify-center">
@@ -148,7 +208,7 @@ export function VideoScreen() {
     );
   }
 
-  // No advertisement or error - show skip screen
+  // Tidak ada iklan aktif atau error API
   if (!advertisement || error) {
     return (
       <div className="fixed inset-0 bg-gradient-to-br from-gray-900 to-black flex flex-col items-center justify-center p-6">
@@ -185,52 +245,59 @@ export function VideoScreen() {
   return (
     <div className="fixed inset-0 bg-black flex flex-col animate-fade-in">
       <div className="flex-1 relative overflow-hidden">
-        <>
-            <video
-              ref={videoRef}
-              className="absolute inset-0 w-full h-full object-cover pointer-events-none"
-              muted={isMuted}
-              playsInline
-              autoPlay
-              controls={false}
-              controlsList="nodownload nofullscreen noremoteplayback"
-              disablePictureInPicture
-              onEnded={handleVideoEnded}
-              onContextMenu={(e) => e.preventDefault()}
-              onLoadedData={(e) => {
-                const video = e.currentTarget;
-                video.play().then(() => {
-                  setIsPlaying(true);
-                }).catch(() => {
-                  setIsPlaying(false);
-                });
-              }}
-            >
-              <source src={getVideoUrl()} type="video/mp4" />
-            </video>
-            {isPlaying && (
-              <div 
-                className="absolute inset-0 z-10" 
-                style={{ backgroundColor: 'transparent' }}
-                onClick={(e) => e.preventDefault()}
-                onContextMenu={(e) => e.preventDefault()}
-              />
-            )}
-            {!isPlaying && (
-              <button
-                onClick={handlePlay}
-                className="absolute inset-0 flex items-center justify-center bg-black/40 transition-opacity z-20"
-              >
-                <div className="w-20 h-20 rounded-full bg-primary flex items-center justify-center shadow-2xl">
-                  <Play className="w-9 h-9 text-primary-foreground ml-1" fill="currentColor" />
-                </div>
-              </button>
-            )}
-          </>
+        <video
+          ref={videoRef}
+          className="absolute inset-0 w-full h-full object-cover pointer-events-none"
+          muted={isMuted}
+          playsInline
+          autoPlay
+          controls={false}
+          controlsList="nodownload nofullscreen noremoteplayback"
+          disablePictureInPicture
+          poster={advertisement.thumbnailUrl || undefined}
+          onPlaying={handlePlaying}
+          onWaiting={handleWaiting}
+          onStalled={handleWaiting}
+          onPause={handlePause}
+          onEnded={handleVideoEnded}
+          onError={handleVideoError}
+          onContextMenu={(e) => e.preventDefault()}
+        >
+          <source src={getVideoUrl()} />
+        </video>
 
+        {/* Indikator Buffering */}
+        {isBuffering && !videoError && (
+          <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-black/60 gap-3">
+            <Loader2 className="w-10 h-10 text-primary animate-spin" />
+            <p className="text-white text-sm font-medium">Memuat video...</p>
+          </div>
+        )}
+
+        {/* Indikator Error Video */}
+        {videoError && (
+          <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-black/75 gap-3 p-6 text-center">
+            <AlertCircle className="w-12 h-12 text-yellow-500" />
+            <p className="text-white text-sm font-medium">{videoError}</p>
+          </div>
+        )}
+
+        {/* Tombol Play Manual jika Autoplay Ditolak */}
+        {!isPlaying && !isBuffering && !videoError && !videoEnded && (
+          <button
+            onClick={handlePlay}
+            className="absolute inset-0 flex items-center justify-center bg-black/40 transition-opacity z-20"
+            aria-label="Putar video"
+          >
+            <div className="w-20 h-20 rounded-full bg-primary flex items-center justify-center shadow-2xl">
+              <Play className="w-9 h-9 text-primary-foreground ml-1" fill="currentColor" />
+            </div>
+          </button>
+        )}
+
+        {/* Header Iklan & Kontrol */}
         {isPlaying && (
           <>
-            {/* Countdown Badge */}
             {countdown > 0 && isSkipable && (
               <div className="absolute top-6 right-6 px-4 py-2 rounded-full bg-black/60 backdrop-blur-sm z-20">
                 <span className="text-base font-medium text-white">
@@ -239,12 +306,12 @@ export function VideoScreen() {
               </div>
             )}
 
-            {/* Title & Mute */}
             <div className="absolute top-6 left-6 flex items-center gap-3 z-20">
               <span className="text-white/80 text-sm font-medium">Iklan</span>
               <button
                 onClick={toggleMute}
                 className="w-10 h-10 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center transition-colors hover:bg-black/60"
+                aria-label={isMuted ? 'Nyalakan suara' : 'Bisukan suara'}
               >
                 {isMuted ? (
                   <VolumeX className="w-5 h-5 text-white" />
@@ -255,11 +322,16 @@ export function VideoScreen() {
             </div>
           </>
         )}
+
+        {isBuffering && !videoError && countdown > 0 && (
+          <div className="absolute top-6 right-6 px-4 py-2 rounded-full bg-black/60 backdrop-blur-sm z-20">
+            <span className="text-sm font-medium text-white/80">Buffering...</span>
+          </div>
+        )}
       </div>
 
-      {/* Bottom Section - Fixed */}
+      {/* Bagian Bawah */}
       <div className="bg-gradient-to-t from-black via-black/90 to-transparent pt-16 pb-8 px-6">
-        {/* Progress Bar */}
         <div className="h-1 bg-white/20 rounded-full overflow-hidden mb-6">
           <div
             className="h-full bg-primary transition-all duration-1000 ease-linear rounded-full"
@@ -267,7 +339,6 @@ export function VideoScreen() {
           />
         </div>
 
-        {/* Action Button */}
         <button
           onClick={handleNext}
           disabled={!canSkip || checkingSession}
@@ -282,7 +353,11 @@ export function VideoScreen() {
               <Loader2 className="w-5 h-5 animate-spin" />
               Memeriksa...
             </>
-          ) : canSkip ? 'Lanjutkan' : `Tunggu ${countdown} detik`}
+          ) : canSkip ? (
+            stallBypass ? 'Lanjutkan (Koneksi Lambat)' : 'Lanjutkan'
+          ) : (
+            `Tunggu ${countdown} detik`
+          )}
         </button>
       </div>
     </div>

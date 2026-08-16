@@ -12,6 +12,7 @@ import { VoucherModule } from './modules/voucher/voucher.module';
 import { MikrotikModule } from './modules/mikrotik/mikrotik.module';
 import { WhatsappModule } from './modules/whatsapp/whatsapp.module';
 import { UserModule } from './modules/user/user.module';
+import { SessionModule } from './modules/session/session.module';
 import { SettingModule } from './modules/setting/setting.module';
 import { LogModule } from './modules/log/log.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
@@ -35,6 +36,7 @@ import { RedisModule } from './modules/redis/redis.module';
     VoucherModule,
     MikrotikModule,
     WhatsappModule,
+    SessionModule,
     UserModule,
     SettingModule,
     LogModule,
