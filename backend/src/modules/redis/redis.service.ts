@@ -21,11 +21,11 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   constructor(private configService: ConfigService) {}
 
   async onModuleInit() {
-    const redisHost = this.configService.get('REDIS_HOST');
-    const redisPort = this.configService.get('REDIS_PORT') || 6379;
+    const redisHost = this.configService.get<string>('REDIS_HOST');
+    const redisPort = this.configService.get<number | string>('REDIS_PORT') || 6379;
     
-    // Only connect to Redis if REDIS_HOST is configured
-    if (!redisHost) {
+    // Only connect to Redis if REDIS_HOST is explicitly configured and not empty
+    if (!redisHost || redisHost.trim() === '' || redisHost === 'disabled' || redisHost === 'false') {
       this.logger.log('📦 Redis not configured - running in local mode (no pub/sub)');
       this.useRedis = false;
       return;
