@@ -26,13 +26,6 @@ interface RolePermission {
   userCount?: number;
 }
 
-const initialUsers: AdminUser[] = [
-  { id: '1', name: 'Super Admin', email: 'superadmin@hotspot.com', role: 'SUPER_ADMIN', isActive: true, createdAt: '2024-01-01', lastLogin: '2024-01-15 12:30' },
-  { id: '2', name: 'Admin User', email: 'admin@hotspot.com', role: 'ADMIN', isActive: true, createdAt: '2024-01-05', lastLogin: '2024-01-15 10:15' },
-  { id: '3', name: 'Operator 1', email: 'operator1@hotspot.com', role: 'OPERATOR', isActive: true, createdAt: '2024-01-10', lastLogin: '2024-01-14 16:45' },
-  { id: '4', name: 'Operator 2', email: 'operator2@hotspot.com', role: 'OPERATOR', isActive: false, createdAt: '2024-01-10', lastLogin: '2024-01-10 09:00' },
-];
-
 const defaultPermissions: RolePermission[] = [
   {
     id: 'SUPER_ADMIN',
@@ -272,7 +265,7 @@ export default function AdminSettings() {
         toast.error(`Koneksi Mikrotik gagal: ${errorMsg}`);
       }
     } catch (error: unknown) {
-      const errorMsg = getErrorMessage(error, 'Network error');
+      const errorMsg = getErrorMessage(error, 'Gagal terhubung ke server');
       console.error('Mikrotik test error:', error);
       setMikrotikStatus({ connected: false, message: errorMsg });
       toast.error(`Koneksi Mikrotik gagal: ${errorMsg}`);
@@ -319,7 +312,7 @@ export default function AdminSettings() {
         toast.error(response.data.message || 'Gateway belum siap');
       }
     } catch (error: unknown) {
-      toast.error(getErrorMessage(error, 'Network error'));
+      toast.error(getErrorMessage(error, 'Gagal terhubung ke server'));
     } finally {
       setIsWaTesting(false);
     }
@@ -599,7 +592,7 @@ export default function AdminSettings() {
       <AdminSidebar />
       
       <main className="admin-content">
-        <AdminHeader title="Settings" subtitle="Manage users and role permissions" />
+        <AdminHeader title="Pengaturan" subtitle="Kelola pengguna dan hak akses" />
         
         <div className="p-6 space-y-6 animate-fade-in">
           {/* Tabs */}
@@ -613,7 +606,7 @@ export default function AdminSettings() {
               }`}
             >
               <Users className="w-4 h-4" />
-              User Management
+              Manajemen Pengguna
             </button>
             <button
               onClick={() => setActiveTab('roles')}
@@ -624,7 +617,7 @@ export default function AdminSettings() {
               }`}
             >
               <Shield className="w-4 h-4" />
-              Role Permissions
+              Hak Akses Peran
             </button>
             <button
               onClick={() => setActiveTab('mikrotik')}
@@ -654,9 +647,9 @@ export default function AdminSettings() {
           {activeTab === 'users' && (
             <div className="stat-card">
               <div className="flex items-center justify-between mb-4">
-                <h2 className="font-semibold text-foreground">Admin Users</h2>
+                <h2 className="font-semibold text-foreground">Pengguna Admin</h2>
                 <ActionButton variant="primary" icon={Plus} onClick={openAddUserModal}>
-                  Add User
+                  Tambah Pengguna
                 </ActionButton>
               </div>
 
@@ -669,11 +662,11 @@ export default function AdminSettings() {
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-border">
-                      <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">User</th>
-                      <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Role</th>
+                      <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Pengguna</th>
+                      <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Peran</th>
                       <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Status</th>
-                      <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Created</th>
-                      <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Actions</th>
+                      <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Dibuat</th>
+                      <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Aksi</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -697,7 +690,7 @@ export default function AdminSettings() {
                         </td>
                         <td className="py-3 px-4">
                           <Badge variant={user.isActive ? 'success' : 'default'}>
-                            {user.isActive ? 'Active' : 'Inactive'}
+                            {user.isActive ? 'Aktif' : 'Nonaktif'}
                           </Badge>
                         </td>
                         <td className="py-3 px-4 text-sm text-muted-foreground">{new Date(user.createdAt).toLocaleDateString()}</td>
@@ -733,7 +726,7 @@ export default function AdminSettings() {
               {/* Add Role Button */}
               <div className="flex justify-end">
                 <ActionButton variant="primary" icon={Plus} onClick={openAddRoleModal}>
-                  Tambah Role
+                  Tambah Peran
                 </ActionButton>
               </div>
 
@@ -749,7 +742,7 @@ export default function AdminSettings() {
                         {role.name}
                       </Badge>
                       <span className="text-sm text-muted-foreground">
-                        {role.userCount ?? 0} users
+                        {role.userCount ?? 0} pengguna
                       </span>
                     </div>
                     <div className="flex items-center gap-2">
@@ -766,13 +759,13 @@ export default function AdminSettings() {
 
                   <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-4">
                     <div className="text-center">
-                      <p className="text-xs text-muted-foreground mb-2">Dashboard</p>
+                      <p className="text-xs text-muted-foreground mb-2">Dasbor</p>
                       <div className={`w-8 h-8 rounded-full mx-auto flex items-center justify-center ${role.permissions.dashboard ? 'bg-success/10 text-success' : 'bg-muted text-muted-foreground'}`}>
                         {role.permissions.dashboard ? <Check className="w-4 h-4" /> : <X className="w-4 h-4" />}
                       </div>
                     </div>
                     <div className="text-center">
-                      <p className="text-xs text-muted-foreground mb-2">Users</p>
+                      <p className="text-xs text-muted-foreground mb-2">Pengguna</p>
                       <div className="flex justify-center gap-1">
                         {['view', 'create', 'edit', 'delete'].map((action) => (
                           <div 
@@ -786,7 +779,7 @@ export default function AdminSettings() {
                       </div>
                     </div>
                     <div className="text-center">
-                      <p className="text-xs text-muted-foreground mb-2">Vouchers</p>
+                      <p className="text-xs text-muted-foreground mb-2">Voucher</p>
                       <div className="flex justify-center gap-1">
                         {['view', 'create', 'edit', 'delete'].map((action) => (
                           <div 
@@ -800,7 +793,7 @@ export default function AdminSettings() {
                       </div>
                     </div>
                     <div className="text-center">
-                      <p className="text-xs text-muted-foreground mb-2">Ads</p>
+                      <p className="text-xs text-muted-foreground mb-2">Iklan</p>
                       <div className="flex justify-center gap-1">
                         {['view', 'create', 'edit', 'delete'].map((action) => (
                           <div 
@@ -834,7 +827,7 @@ export default function AdminSettings() {
                       </div>
                     </div>
                     <div className="text-center">
-                      <p className="text-xs text-muted-foreground mb-2">Settings</p>
+                      <p className="text-xs text-muted-foreground mb-2">Pengaturan</p>
                       <div className="flex justify-center gap-1">
                         {['view', 'edit'].map((action) => (
                           <div 
@@ -862,9 +855,9 @@ export default function AdminSettings() {
                     <Wifi className={`w-5 h-5 ${mikrotikStatus?.connected ? 'text-success' : 'text-destructive'}`} />
                   </div>
                   <div>
-                    <h2 className="font-semibold text-foreground">Mikrotik Router Settings</h2>
+                    <h2 className="font-semibold text-foreground">Pengaturan Router MikroTik</h2>
                     <p className="text-sm text-muted-foreground">
-                      {mikrotikStatus?.connected ? 'Connected' : 'Not Connected'}
+                      {mikrotikStatus?.connected ? 'Terhubung' : 'Tidak terhubung'}
                     </p>
                   </div>
                 </div>
@@ -881,7 +874,7 @@ export default function AdminSettings() {
                 <div className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm font-medium text-foreground mb-2">Host / IP Address</label>
+                      <label className="block text-sm font-medium text-foreground mb-2">Host / Alamat IP</label>
                       <input
                         type="text"
                         value={mikrotikSettings.host}
@@ -903,7 +896,7 @@ export default function AdminSettings() {
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm font-medium text-foreground mb-2">Username</label>
+                      <label className="block text-sm font-medium text-foreground mb-2">Nama Pengguna</label>
                       <input
                         type="text"
                         value={mikrotikSettings.username}
@@ -913,7 +906,7 @@ export default function AdminSettings() {
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-foreground mb-2">Password</label>
+                      <label className="block text-sm font-medium text-foreground mb-2">Kata Sandi</label>
                       <input
                         type="password"
                         value={mikrotikSettings.password}
@@ -931,14 +924,14 @@ export default function AdminSettings() {
                       className="h-10 px-4 rounded-xl bg-secondary text-foreground font-medium text-sm hover:bg-secondary/80 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {isMikrotikTesting ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-                      Test Connection
+                      Uji Koneksi
                     </button>
                     <button 
                       onClick={saveMikrotikSettings}
                       disabled={isMikrotikLoading}
                       className="h-10 px-4 rounded-xl bg-primary text-primary-foreground font-medium text-sm hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      Save Settings
+                      Simpan Pengaturan
                     </button>
                   </div>
                 </div>
@@ -990,7 +983,7 @@ export default function AdminSettings() {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-foreground mb-2">Master Switch</label>
+                    <label className="block text-sm font-medium text-foreground mb-2">Sakelar Utama</label>
                     <div className="h-10 flex items-center">
                       <label className="relative inline-flex items-center cursor-pointer">
                         <input type="checkbox" checked={waConfig.enabled} onChange={(e) => setWaConfig((prev) => ({ ...prev, enabled: e.target.checked }))} className="sr-only peer" />
@@ -1000,7 +993,7 @@ export default function AdminSettings() {
                     </div>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-foreground mb-2">Auto-Reconnect</label>
+                    <label className="block text-sm font-medium text-foreground mb-2">Sambung Ulang Otomatis</label>
                     <div className="h-10 flex items-center">
                       <label className="relative inline-flex items-center cursor-pointer">
                         <input type="checkbox" checked={waConfig.autoReconnect} onChange={(e) => setWaConfig((prev) => ({ ...prev, autoReconnect: e.target.checked }))} className="sr-only peer" />
@@ -1017,7 +1010,7 @@ export default function AdminSettings() {
                   </button>
                   <button onClick={testWhatsapp} disabled={isWaTesting} className="h-10 px-4 rounded-xl bg-secondary text-foreground font-medium text-sm hover:bg-secondary/80 transition-colors flex items-center gap-2 disabled:opacity-50">
                     {isWaTesting ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-                    Test Gateway
+                    Uji Gateway
                   </button>
                 </div>
               </div>
@@ -1052,14 +1045,14 @@ export default function AdminSettings() {
                                 {s.name || 'Tanpa label'} <span className="text-xs text-muted-foreground">({s.phone})</span>
                               </p>
                               <p className="text-xs text-muted-foreground">
-                                {s.sentCount} pesan · {s.paired ? 'paired' : 'belum paired'}
+                                {s.sentCount} pesan · {s.paired ? 'sudah terhubung' : 'belum terhubung'}
                                 {s.lastError ? ` · ${s.lastError}` : ''}
                               </p>
                             </div>
                           </div>
                           <div className="flex items-center gap-2">
                             <Badge variant={s.state === 'CONNECTED' ? 'success' : s.state === 'CONNECTING' ? 'warning' : 'default'}>
-                              {s.state}
+                              {s.state === 'CONNECTED' ? 'Terhubung' : s.state === 'CONNECTING' ? 'Menghubungkan' : 'Terputus'}
                             </Badge>
                             <Badge variant={s.active ? 'success' : 'default'}>{s.active ? 'Aktif' : 'Nonaktif'}</Badge>
                             <button onClick={() => renameWhatsappSession(s)} className="w-8 h-8 rounded-lg hover:bg-secondary flex items-center justify-center transition-colors" title="Edit label">
@@ -1146,7 +1139,7 @@ export default function AdminSettings() {
                     <select value={waLogFilter} onChange={(e) => setWaLogFilter(e.target.value)} className="h-10 px-3 rounded-xl bg-secondary border-0 text-sm">
                       <option value="">Semua status</option>
                       <option value="SENT">Terkirim</option>
-                      <option value="PENDING">Pending</option>
+                      <option value="PENDING">Menunggu</option>
                       <option value="FAILED">Gagal</option>
                       <option value="RECEIVED">Masuk</option>
                     </select>
@@ -1186,10 +1179,10 @@ export default function AdminSettings() {
                             <td className="py-3 px-4">{log.messageType === 'INCOMING' ? <Badge variant="warning">Masuk</Badge> : <Badge variant="success">Keluar</Badge>}</td>
                             <td className="py-3 px-4 text-sm">{log.sessionPhone}</td>
                             <td className="py-3 px-4 text-sm">{log.recipientPhone}</td>
-                            <td className="py-3 px-4"><Badge>{log.messageType}</Badge></td>
+                            <td className="py-3 px-4"><Badge>{log.messageType === 'VOUCHER' ? 'Voucher' : log.messageType === 'INCOMING' ? 'Masuk' : 'Pesan'}</Badge></td>
                             <td className="py-3 px-4">
                               <Badge variant={log.status === 'SENT' ? 'success' : log.status === 'FAILED' ? 'destructive' : 'default'}>
-                                {log.status}
+                                {log.status === 'SENT' ? 'Terkirim' : log.status === 'FAILED' ? 'Gagal' : log.status === 'PENDING' ? 'Menunggu' : log.status === 'RECEIVED' ? 'Diterima' : log.status}
                               </Badge>
                             </td>
                             <td className="py-3 px-4 text-sm text-muted-foreground max-w-[280px]">
@@ -1213,7 +1206,7 @@ export default function AdminSettings() {
           <div className="bg-background rounded-2xl max-w-md w-full shadow-elevated">
             <div className="flex items-center justify-between p-4 border-b border-border">
               <h2 className="text-lg font-semibold text-foreground">
-                {modalType === 'add-user' ? 'Tambah User Baru' : 'Edit User'}
+                {modalType === 'add-user' ? 'Tambah Pengguna Baru' : 'Ubah Pengguna'}
               </h2>
               <button 
                 onClick={closeModal}
@@ -1349,7 +1342,7 @@ export default function AdminSettings() {
             <div className="p-4 space-y-4 overflow-y-auto flex-1">
               {/* Dashboard */}
               <div className="flex items-center justify-between bg-secondary rounded-xl p-4">
-                <span className="text-sm font-medium text-foreground">Dashboard</span>
+                <span className="text-sm font-medium text-foreground">Dasbor</span>
                 <label className="relative inline-flex items-center cursor-pointer">
                   <input 
                     type="checkbox" 
@@ -1363,7 +1356,7 @@ export default function AdminSettings() {
 
               {/* Users */}
               <div className="bg-secondary rounded-xl p-4">
-                <p className="text-sm font-medium text-foreground mb-3">Users</p>
+                <p className="text-sm font-medium text-foreground mb-3">Pengguna</p>
                 <div className="grid grid-cols-4 gap-2">
                   {['view', 'create', 'edit', 'delete'].map((action) => (
                     <label key={action} className="flex items-center gap-2 cursor-pointer">
@@ -1435,7 +1428,7 @@ export default function AdminSettings() {
 
               {/* Logs */}
               <div className="flex items-center justify-between bg-secondary rounded-xl p-4">
-                <span className="text-sm font-medium text-foreground">System Logs</span>
+                <span className="text-sm font-medium text-foreground">Log Sistem</span>
                 <label className="relative inline-flex items-center cursor-pointer">
                   <input 
                     type="checkbox" 
@@ -1449,7 +1442,7 @@ export default function AdminSettings() {
 
               {/* Settings */}
               <div className="bg-secondary rounded-xl p-4">
-                <p className="text-sm font-medium text-foreground mb-3">Settings</p>
+                <p className="text-sm font-medium text-foreground mb-3">Pengaturan</p>
                 <div className="grid grid-cols-4 gap-2">
                   {['view', 'edit'].map((action) => (
                     <label key={action} className="flex items-center gap-2 cursor-pointer">
@@ -1490,7 +1483,7 @@ export default function AdminSettings() {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-fade-in">
           <div className="bg-background rounded-2xl max-w-lg w-full shadow-elevated max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between p-4 border-b border-border sticky top-0 bg-background">
-              <h2 className="text-lg font-semibold text-foreground">Tambah Role Baru</h2>
+              <h2 className="text-lg font-semibold text-foreground">Tambah Peran Baru</h2>
               <button 
                 onClick={closeModal}
                 className="w-8 h-8 rounded-full hover:bg-secondary flex items-center justify-center transition-colors"
@@ -1513,7 +1506,7 @@ export default function AdminSettings() {
 
               {/* Dashboard */}
               <div className="flex items-center justify-between bg-secondary rounded-xl p-4">
-                <span className="text-sm font-medium text-foreground">Dashboard</span>
+                <span className="text-sm font-medium text-foreground">Dasbor</span>
                 <label className="relative inline-flex items-center cursor-pointer">
                   <input 
                     type="checkbox" 
@@ -1527,7 +1520,7 @@ export default function AdminSettings() {
 
               {/* Users */}
               <div className="bg-secondary rounded-xl p-4">
-                <p className="text-sm font-medium text-foreground mb-3">Users</p>
+                <p className="text-sm font-medium text-foreground mb-3">Pengguna</p>
                 <div className="grid grid-cols-4 gap-2">
                   {['view', 'create', 'edit', 'delete'].map((action) => (
                     <label key={action} className="flex items-center gap-2 cursor-pointer">
@@ -1599,7 +1592,7 @@ export default function AdminSettings() {
 
               {/* Logs */}
               <div className="flex items-center justify-between bg-secondary rounded-xl p-4">
-                <span className="text-sm font-medium text-foreground">System Logs</span>
+                <span className="text-sm font-medium text-foreground">Log Sistem</span>
                 <label className="relative inline-flex items-center cursor-pointer">
                   <input 
                     type="checkbox" 
@@ -1613,7 +1606,7 @@ export default function AdminSettings() {
 
               {/* Settings */}
               <div className="bg-secondary rounded-xl p-4">
-                <p className="text-sm font-medium text-foreground mb-3">Settings</p>
+                <p className="text-sm font-medium text-foreground mb-3">Pengaturan</p>
                 <div className="grid grid-cols-4 gap-2">
                   {['view', 'edit'].map((action) => (
                     <label key={action} className="flex items-center gap-2 cursor-pointer">
@@ -1641,7 +1634,7 @@ export default function AdminSettings() {
                   disabled={isSaving}
                   className="flex-1 h-10 rounded-xl bg-primary text-primary-foreground font-medium text-sm hover:bg-primary/90 transition-colors disabled:opacity-50"
                 >
-                  {isSaving ? 'Menyimpan...' : 'Tambah Role'}
+                  {isSaving ? 'Menyimpan...' : 'Tambah Peran'}
                 </button>
               </div>
             </div>

@@ -48,7 +48,7 @@ export default function AdminLogs() {
       const response = await logApi.getAll(params);
       setLogs(response.data.data || []);
     } catch (error) {
-      toast.error('Gagal memuat logs');
+      toast.error('Gagal memuat log');
     } finally {
       setIsLoading(false);
     }
@@ -56,7 +56,7 @@ export default function AdminLogs() {
 
   const handleExport = () => {
     // Export logs as CSV
-    const headers = ['Timestamp', 'Type', 'Action', 'Description', 'Status', 'IP Address', 'MAC Address'];
+    const headers = ['Waktu', 'Tipe', 'Aksi', 'Deskripsi', 'Status', 'Alamat IP', 'Alamat MAC'];
     const rows = logs.map(l => [
       new Date(l.createdAt).toLocaleString('id-ID'),
       l.type,
@@ -75,7 +75,7 @@ export default function AdminLogs() {
     a.download = `logs-${new Date().toISOString().split('T')[0]}.csv`;
     a.click();
     URL.revokeObjectURL(url);
-    toast.success('Logs exported successfully');
+    toast.success('Log berhasil diekspor');
   };
 
   const filteredLogs = logs.filter(log => {
@@ -101,7 +101,7 @@ export default function AdminLogs() {
       <AdminSidebar />
       
       <main className="admin-content">
-        <AdminHeader title="System Logs" subtitle="Monitor system events and user activities" />
+        <AdminHeader title="Log Sistem" subtitle="Pantau peristiwa sistem dan aktivitas pengguna" />
         
         <div className="p-6 space-y-6 animate-fade-in">
           {/* Filters */}
@@ -112,7 +112,7 @@ export default function AdminLogs() {
                 <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
                 <input
                   type="text"
-                  placeholder="Search MAC, user, event..."
+                  placeholder="Cari MAC, pengguna, atau peristiwa..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="h-10 pl-9 pr-4 rounded-xl bg-secondary border-0 text-sm placeholder:text-muted-foreground focus:ring-2 focus:ring-primary w-full sm:w-64"
@@ -127,10 +127,10 @@ export default function AdminLogs() {
                   onChange={(e) => setDateRange(e.target.value)}
                   className="h-10 px-3 rounded-xl bg-secondary border-0 text-sm"
                 >
-                  <option value="today">Today</option>
-                  <option value="yesterday">Yesterday</option>
-                  <option value="week">Last 7 days</option>
-                  <option value="month">Last 30 days</option>
+                  <option value="today">Hari ini</option>
+                  <option value="yesterday">Kemarin</option>
+                  <option value="week">7 hari terakhir</option>
+                  <option value="month">30 hari terakhir</option>
                 </select>
               </div>
 
@@ -142,21 +142,21 @@ export default function AdminLogs() {
                   onChange={(e) => setStatusFilter(e.target.value)}
                   className="h-10 px-3 rounded-xl bg-secondary border-0 text-sm"
                 >
-                  <option value="all">All Events</option>
-                  <option value="success">Success</option>
-                  <option value="warning">Warning</option>
-                  <option value="error">Error</option>
-                  <option value="info">Info</option>
+                  <option value="all">Semua peristiwa</option>
+                  <option value="success">Berhasil</option>
+                  <option value="warning">Peringatan</option>
+                  <option value="error">Gagal</option>
+                  <option value="info">Informasi</option>
                 </select>
               </div>
             </div>
 
             <div className="flex items-center gap-3">
               <ActionButton variant="ghost" size="sm" icon={isLoading ? Loader2 : RefreshCw} onClick={loadLogs}>
-                {isLoading ? 'Loading...' : 'Refresh'}
+                {isLoading ? 'Memuat...' : 'Muat ulang'}
               </ActionButton>
               <ActionButton variant="secondary" icon={Download} onClick={handleExport}>
-                Export
+                Ekspor
               </ActionButton>
             </div>
           </div>
@@ -169,7 +169,7 @@ export default function AdminLogs() {
                 <p className="text-xl font-bold text-foreground">
                   {logs.filter(l => l.status === 'SUCCESS').length}
                 </p>
-                <p className="text-xs text-muted-foreground">Success</p>
+                <p className="text-xs text-muted-foreground">Berhasil</p>
               </div>
             </div>
             <div className="stat-card flex items-center gap-3">
@@ -178,7 +178,7 @@ export default function AdminLogs() {
                 <p className="text-xl font-bold text-foreground">
                   {logs.filter(l => l.status === 'WARNING').length}
                 </p>
-                <p className="text-xs text-muted-foreground">Warnings</p>
+                <p className="text-xs text-muted-foreground">Peringatan</p>
               </div>
             </div>
             <div className="stat-card flex items-center gap-3">
@@ -187,7 +187,7 @@ export default function AdminLogs() {
                 <p className="text-xl font-bold text-foreground">
                   {logs.filter(l => l.status === 'ERROR').length}
                 </p>
-                <p className="text-xs text-muted-foreground">Errors</p>
+                <p className="text-xs text-muted-foreground">Gagal</p>
               </div>
             </div>
             <div className="stat-card flex items-center gap-3">
@@ -208,7 +208,7 @@ export default function AdminLogs() {
                 <Loader2 className="w-8 h-8 animate-spin text-primary" />
               </div>
             ) : (
-            <DataTable headers={['Timestamp', 'Type', 'Action', 'Description', 'IP Address', 'Status']}>
+            <DataTable headers={['Waktu', 'Tipe', 'Aksi', 'Deskripsi', 'Alamat IP', 'Status']}>
               {filteredLogs.map((log) => (
                 <tr key={log.id}>
                   <td className="font-mono text-xs text-muted-foreground whitespace-nowrap">
@@ -231,7 +231,7 @@ export default function AdminLogs() {
             {/* Pagination */}
             <div className="flex items-center justify-between mt-4 pt-4 border-t border-border">
               <p className="text-sm text-muted-foreground">
-                Showing {filteredLogs.length} of {logs.length} logs
+                Menampilkan {filteredLogs.length} dari {logs.length} log
               </p>
             </div>
           </div>

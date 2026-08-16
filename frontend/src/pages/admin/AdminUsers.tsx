@@ -141,7 +141,7 @@ export default function AdminUsers() {
     setConfirmAction({ type: 'delete', userId, userName });
   };
 
-  const getUserDisplayName = (user: User) => user.name || user.phone || 'Unknown';
+  const getUserDisplayName = (user: User) => user.name || user.phone || 'Tidak diketahui';
 
   const executeAction = async () => {
     if (!confirmAction) return;
@@ -151,19 +151,19 @@ export default function AdminUsers() {
       switch (confirmAction.type) {
         case 'kick':
           await userApi.kick(confirmAction.userId);
-          toast.success(`User ${confirmAction.userName} berhasil di-kick`);
+          toast.success(`Pengguna ${confirmAction.userName} berhasil diputus`);
           break;
         case 'block':
           await userApi.block(confirmAction.userId);
-          toast.success(`User ${confirmAction.userName} berhasil diblokir`);
+          toast.success(`Pengguna ${confirmAction.userName} berhasil diblokir`);
           break;
         case 'unblock':
           await userApi.unblock(confirmAction.userId);
-          toast.success(`User ${confirmAction.userName} berhasil di-unblock`);
+          toast.success(`Blokir ${confirmAction.userName} berhasil dibuka`);
           break;
         case 'delete':
           await userApi.delete(confirmAction.userId);
-          toast.success(`User ${confirmAction.userName} berhasil dihapus`);
+          toast.success(`Pengguna ${confirmAction.userName} berhasil dihapus`);
           break;
       }
       
@@ -181,10 +181,10 @@ export default function AdminUsers() {
 
   const getActionTitle = () => {
     switch (confirmAction?.type) {
-      case 'kick': return 'Kick User';
-      case 'block': return 'Block User';
-      case 'unblock': return 'Unblock User';
-      case 'delete': return 'Hapus User';
+      case 'kick': return 'Putuskan Pengguna';
+      case 'block': return 'Blokir Pengguna';
+      case 'unblock': return 'Buka Blokir Pengguna';
+      case 'delete': return 'Hapus Pengguna';
       default: return '';
     }
   };
@@ -192,7 +192,7 @@ export default function AdminUsers() {
   const getActionMessage = () => {
     switch (confirmAction?.type) {
       case 'kick': return `Apakah Anda yakin ingin memutus koneksi ${confirmAction.userName}?`;
-      case 'block': return `Apakah Anda yakin ingin memblokir ${confirmAction.userName}? User tidak akan bisa login lagi.`;
+      case 'block': return `Apakah Anda yakin ingin memblokir ${confirmAction.userName}? Pengguna tidak akan dapat masuk lagi.`;
       case 'unblock': return `Apakah Anda yakin ingin membuka blokir ${confirmAction.userName}?`;
       case 'delete': return `Apakah Anda yakin ingin menghapus ${confirmAction.userName}? Tindakan ini tidak dapat dibatalkan.`;
       default: return '';
@@ -215,7 +215,7 @@ export default function AdminUsers() {
       <AdminSidebar />
       
       <main className="admin-content">
-        <AdminHeader title="User Management" subtitle="Active sessions and connected devices" />
+        <AdminHeader title="Manajemen Pengguna" subtitle="Sesi aktif dan perangkat yang terhubung" />
         
         <div className="p-6 space-y-6 animate-fade-in">
           {/* Stats Summary Cards */}
@@ -260,7 +260,7 @@ export default function AdminUsers() {
                 </div>
                 <div>
                   <p className="text-2xl font-bold text-destructive">{stats.blocked}</p>
-                  <p className="text-xs text-muted-foreground">Blocked</p>
+                  <p className="text-xs text-muted-foreground">Diblokir</p>
                 </div>
               </div>
             </div>
@@ -275,7 +275,7 @@ export default function AdminUsers() {
                 </div>
                 <div>
                   <p className="text-2xl font-bold text-primary">{stats.total}</p>
-                  <p className="text-xs text-muted-foreground">Total Users</p>
+                  <p className="text-xs text-muted-foreground">Total Pengguna</p>
                 </div>
               </div>
             </div>
@@ -307,7 +307,7 @@ export default function AdminUsers() {
                   <option value="all">Semua Status</option>
                   <option value="online">Online</option>
                   <option value="offline">Offline</option>
-                  <option value="blocked">Blocked</option>
+                  <option value="blocked">Diblokir</option>
                 </select>
               </div>
             </div>
@@ -319,7 +319,7 @@ export default function AdminUsers() {
                 className="h-10 px-4 rounded-xl bg-secondary text-foreground font-medium text-sm hover:bg-secondary/80 transition-colors flex items-center gap-2 disabled:opacity-50"
               >
                 <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-                Refresh
+                Muat ulang
               </button>
             </div>
           </div>
@@ -334,11 +334,11 @@ export default function AdminUsers() {
             ) : users.length === 0 ? (
               <div className="text-center py-12">
                 <UserX className="w-12 h-12 mx-auto text-muted-foreground mb-3" />
-                <p className="text-muted-foreground">Tidak ada user ditemukan</p>
+                <p className="text-muted-foreground">Tidak ada pengguna ditemukan</p>
               </div>
             ) : (
               <>
-                <DataTable headers={['User', 'IP Address', 'Voucher', 'Data Usage', 'Uptime', 'Status', 'Actions']}>
+                <DataTable headers={['Pengguna', 'Alamat IP', 'Voucher', 'Penggunaan Data', 'Durasi', 'Status', 'Aksi']}>
                   {users.map((user) => {
                     const mac = user.macAddress || user.mac || '-';
                     const ip = user.ipAddress || user.ip || '-';
@@ -349,7 +349,7 @@ export default function AdminUsers() {
                     const bytesOut = user.bytesOut || 0;
                     const totalBytes = bytesIn + bytesOut;
                     const uptime = user.uptime || user.sessionTime || '-';
-                    const displayName = user.name || user.phone || 'Unknown';
+                    const displayName = user.name || user.phone || 'Tidak diketahui';
                     const displayPhone = user.phone || '-';
                     
                     return (
@@ -401,7 +401,7 @@ export default function AdminUsers() {
                               'default'
                             }
                           >
-                            {isBlocked ? 'Blocked' : isOnline ? 'Online' : 'Offline'}
+                            {isBlocked ? 'Diblokir' : isOnline ? 'Online' : 'Offline'}
                           </Badge>
                         </td>
                         <td>
@@ -409,14 +409,14 @@ export default function AdminUsers() {
                             <button 
                               onClick={() => setSelectedUser(user)}
                               className="w-8 h-8 rounded-lg hover:bg-secondary flex items-center justify-center transition-colors"
-                              title="View Detail"
+                              title="Lihat detail"
                             >
                               <Eye className="w-4 h-4 text-muted-foreground" />
                             </button>
                             <button 
                               onClick={() => handleKick(user.id, getUserDisplayName(user))}
                               className="w-8 h-8 rounded-lg hover:bg-warning/10 flex items-center justify-center transition-colors disabled:opacity-30"
-                              title="Kick"
+                              title="Putuskan"
                               disabled={!isOnline}
                             >
                               <Power className={`w-4 h-4 ${isOnline ? 'text-warning' : 'text-muted-foreground'}`} />
@@ -425,7 +425,7 @@ export default function AdminUsers() {
                               <button 
                                 onClick={() => handleUnblock(user.id, getUserDisplayName(user))}
                                 className="w-8 h-8 rounded-lg hover:bg-success/10 flex items-center justify-center transition-colors"
-                                title="Unblock"
+                                title="Buka blokir"
                               >
                                 <UserCheck className="w-4 h-4 text-success" />
                               </button>
@@ -433,7 +433,7 @@ export default function AdminUsers() {
                               <button 
                                 onClick={() => handleBlock(user.id, getUserDisplayName(user))}
                                 className="w-8 h-8 rounded-lg hover:bg-destructive/10 flex items-center justify-center transition-colors"
-                                title="Block"
+                                title="Blokir"
                               >
                                 <Ban className="w-4 h-4 text-destructive" />
                               </button>
@@ -441,7 +441,7 @@ export default function AdminUsers() {
                             <button 
                               onClick={() => handleDelete(user.id, getUserDisplayName(user))}
                               className="w-8 h-8 rounded-lg hover:bg-destructive/10 flex items-center justify-center transition-colors"
-                              title="Delete"
+                              title="Hapus"
                             >
                               <Trash2 className="w-4 h-4 text-destructive" />
                             </button>
@@ -455,7 +455,7 @@ export default function AdminUsers() {
                 {/* Pagination - Simplified */}
                 <div className="flex items-center justify-between gap-4 mt-4 pt-4 border-t border-border">
                   <span className="text-sm text-muted-foreground">
-                    Menampilkan {users.length} dari {pagination.total} user
+                    Menampilkan {users.length} dari {pagination.total} pengguna
                   </span>
 
                   <div className="flex items-center gap-2">
@@ -491,7 +491,7 @@ export default function AdminUsers() {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-fade-in">
           <div className="bg-background rounded-2xl max-w-lg w-full shadow-elevated max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between p-4 border-b border-border sticky top-0 bg-background">
-              <h2 className="text-lg font-semibold text-foreground">Detail User</h2>
+              <h2 className="text-lg font-semibold text-foreground">Detail Pengguna</h2>
               <button 
                 onClick={() => setSelectedUser(null)}
                 className="w-8 h-8 rounded-full hover:bg-secondary flex items-center justify-center transition-colors"
@@ -510,7 +510,7 @@ export default function AdminUsers() {
                   {(selectedUser.name || selectedUser.phone || 'U').charAt(0).toUpperCase()}
                 </div>
                 <div className="flex-1">
-                  <h3 className="font-semibold text-foreground text-lg">{selectedUser.name || selectedUser.phone || 'Unknown'}</h3>
+                  <h3 className="font-semibold text-foreground text-lg">{selectedUser.name || selectedUser.phone || 'Tidak diketahui'}</h3>
                   <p className="text-sm text-muted-foreground">{selectedUser.phone || '-'}</p>
                   <Badge 
                     variant={
@@ -519,7 +519,7 @@ export default function AdminUsers() {
                       'default'
                     }
                   >
-                    {selectedUser.status === 'BLOCKED' ? 'Blocked' : selectedUser.status === 'ONLINE' ? 'Online' : 'Offline'}
+                    {selectedUser.status === 'BLOCKED' ? 'Diblokir' : selectedUser.status === 'ONLINE' ? 'Online' : 'Offline'}
                   </Badge>
                 </div>
               </div>
@@ -529,19 +529,19 @@ export default function AdminUsers() {
                 <h4 className="text-sm font-medium text-muted-foreground mb-3">Informasi Koneksi</h4>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="bg-secondary rounded-xl p-3">
-                    <p className="text-xs text-muted-foreground mb-1">IP Address</p>
+                    <p className="text-xs text-muted-foreground mb-1">Alamat IP</p>
                     <p className="font-mono text-sm text-foreground">{selectedUser.ipAddress || selectedUser.ip || '-'}</p>
                   </div>
                   <div className="bg-secondary rounded-xl p-3">
-                    <p className="text-xs text-muted-foreground mb-1">MAC Address</p>
+                    <p className="text-xs text-muted-foreground mb-1">Alamat MAC</p>
                     <p className="font-mono text-sm text-foreground break-all">{selectedUser.macAddress || selectedUser.mac || '-'}</p>
                   </div>
                   <div className="bg-secondary rounded-xl p-3">
-                    <p className="text-xs text-muted-foreground mb-1">Uptime</p>
+                    <p className="text-xs text-muted-foreground mb-1">Durasi</p>
                     <p className="text-sm text-foreground">{selectedUser.uptime || selectedUser.sessionTime || '-'}</p>
                   </div>
                   <div className="bg-secondary rounded-xl p-3">
-                    <p className="text-xs text-muted-foreground mb-1">Login Time</p>
+                    <p className="text-xs text-muted-foreground mb-1">Waktu Masuk</p>
                     <p className="text-sm text-foreground">{selectedUser.loginAt ? new Date(selectedUser.loginAt).toLocaleString('id-ID') : '-'}</p>
                   </div>
                 </div>
@@ -557,7 +557,7 @@ export default function AdminUsers() {
                       <p className="font-mono text-lg text-primary font-bold">{selectedUser.voucher?.code || '-'}</p>
                     </div>
                     {selectedUser.voucher?.profile && (
-                      <p className="text-xs text-muted-foreground">Profile: {selectedUser.voucher.profile.name}</p>
+                      <p className="text-xs text-muted-foreground">Profil: {selectedUser.voucher.profile.name}</p>
                     )}
                   </div>
                   <div className="grid grid-cols-2 gap-3">
@@ -581,7 +581,7 @@ export default function AdminUsers() {
                   className="flex-1 h-10 rounded-xl bg-warning/10 text-warning font-medium text-sm hover:bg-warning/20 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <Power className="w-4 h-4" />
-                  Kick
+                  Putuskan
                 </button>
                 {selectedUser.status === 'BLOCKED' ? (
                   <button 
@@ -589,7 +589,7 @@ export default function AdminUsers() {
                     className="flex-1 h-10 rounded-xl bg-success/10 text-success font-medium text-sm hover:bg-success/20 transition-colors flex items-center justify-center gap-2"
                   >
                     <UserCheck className="w-4 h-4" />
-                    Unblock
+                    Buka Blokir
                   </button>
                 ) : (
                   <button 
@@ -597,7 +597,7 @@ export default function AdminUsers() {
                     className="flex-1 h-10 rounded-xl bg-destructive/10 text-destructive font-medium text-sm hover:bg-destructive/20 transition-colors flex items-center justify-center gap-2"
                   >
                     <Ban className="w-4 h-4" />
-                    Block
+                    Blokir
                   </button>
                 )}
                 <button 
@@ -605,7 +605,7 @@ export default function AdminUsers() {
                   className="flex-1 h-10 rounded-xl bg-destructive/10 text-destructive font-medium text-sm hover:bg-destructive/20 transition-colors flex items-center justify-center gap-2"
                 >
                   <Trash2 className="w-4 h-4" />
-                  Delete
+                  Hapus
                 </button>
               </div>
             </div>
@@ -653,9 +653,9 @@ export default function AdminUsers() {
                   }`}
                 >
                   {isExecuting && <Loader2 className="w-4 h-4 animate-spin" />}
-                  {confirmAction.type === 'kick' ? 'Kick' : 
-                   confirmAction.type === 'block' ? 'Block' : 
-                   confirmAction.type === 'unblock' ? 'Unblock' : 'Hapus'}
+                  {confirmAction.type === 'kick' ? 'Putuskan' : 
+                   confirmAction.type === 'block' ? 'Blokir' : 
+                   confirmAction.type === 'unblock' ? 'Buka Blokir' : 'Hapus'}
                 </button>
               </div>
             </div>

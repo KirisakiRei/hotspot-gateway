@@ -1,4 +1,4 @@
-import { ChevronDown } from 'lucide-react';
+import { getAdminInitials, getSessionAdmin } from '@/lib/session';
 
 interface AdminHeaderProps {
   title: string;
@@ -6,6 +6,9 @@ interface AdminHeaderProps {
 }
 
 export function AdminHeader({ title, subtitle }: AdminHeaderProps) {
+  const admin = getSessionAdmin();
+  const displayName = admin?.name || 'Administrator';
+
   return (
     <header className="h-16 border-b border-border bg-card px-6 flex items-center justify-between sticky top-0 z-10">
       <div>
@@ -14,14 +17,12 @@ export function AdminHeader({ title, subtitle }: AdminHeaderProps) {
       </div>
 
       <div className="flex items-center gap-4">
-        {/* User Menu */}
-        <button className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-secondary transition-colors">
+        <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg">
           <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-sm font-medium">
-            A
+            {getAdminInitials(displayName)}
           </div>
-          <span className="text-sm font-medium text-foreground hidden sm:block">Admin</span>
-          <ChevronDown className="w-4 h-4 text-muted-foreground" />
-        </button>
+          <span className="text-sm font-medium text-foreground hidden sm:block">{displayName}</span>
+        </div>
       </div>
     </header>
   );

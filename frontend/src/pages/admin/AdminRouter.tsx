@@ -179,7 +179,7 @@ export default function AdminRouter() {
       <div className="min-h-screen bg-background">
         <AdminSidebar />
         <main className="admin-content">
-          <AdminHeader title="Router Management" subtitle="Mikrotik Hotspot Monitoring" />
+          <AdminHeader title="Manajemen Router" subtitle="Pemantauan hotspot MikroTik" />
           <div className="flex items-center justify-center h-64">
             <Loader2 className="w-8 h-8 animate-spin text-primary" />
           </div>
@@ -193,7 +193,7 @@ export default function AdminRouter() {
       <AdminSidebar />
       
       <main className="admin-content">
-        <AdminHeader title="Router Management" subtitle="Mikrotik Hotspot Monitoring" />
+        <AdminHeader title="Manajemen Router" subtitle="Pemantauan hotspot MikroTik" />
         
         <div className="p-6 space-y-6 animate-fade-in">
           {/* Connection Status */}
@@ -249,7 +249,7 @@ export default function AdminRouter() {
                   </div>
                   <div>
                     <p className="text-2xl font-bold text-foreground">{activeSessions.length}</p>
-                    <p className="text-sm text-muted-foreground">Active Sessions</p>
+                    <p className="text-sm text-muted-foreground">Sesi Aktif</p>
                   </div>
                 </div>
               </div>
@@ -260,7 +260,7 @@ export default function AdminRouter() {
                   </div>
                   <div>
                     <p className="text-2xl font-bold text-foreground">{hotspotUsers.length}</p>
-                    <p className="text-sm text-muted-foreground">Hotspot Users</p>
+                    <p className="text-sm text-muted-foreground">Pengguna Hotspot</p>
                   </div>
                 </div>
               </div>
@@ -271,7 +271,7 @@ export default function AdminRouter() {
                   </div>
                   <div>
                     <p className="text-2xl font-bold text-foreground">{hotspotProfiles.length}</p>
-                    <p className="text-sm text-muted-foreground">Profiles</p>
+                    <p className="text-sm text-muted-foreground">Profil</p>
                   </div>
                 </div>
               </div>
@@ -284,7 +284,7 @@ export default function AdminRouter() {
                     <p className="text-2xl font-bold text-foreground">
                       {hotspotUsers.filter(u => u.disabled === 'false').length}
                     </p>
-                    <p className="text-sm text-muted-foreground">Enabled Users</p>
+                    <p className="text-sm text-muted-foreground">Pengguna Aktif</p>
                   </div>
                 </div>
               </div>
@@ -314,7 +314,7 @@ export default function AdminRouter() {
                       : 'text-muted-foreground hover:text-foreground'
                   }`}
                 >
-                  Active Sessions ({activeSessions.length})
+                  Sesi Aktif ({activeSessions.length})
                 </button>
                 <button
                   onClick={() => setActiveTab('users')}
@@ -324,7 +324,7 @@ export default function AdminRouter() {
                       : 'text-muted-foreground hover:text-foreground'
                   }`}
                 >
-                  Hotspot Users ({hotspotUsers.length})
+                  Pengguna Hotspot ({hotspotUsers.length})
                 </button>
                 <button
                   onClick={() => setActiveTab('profiles')}
@@ -334,7 +334,7 @@ export default function AdminRouter() {
                       : 'text-muted-foreground hover:text-foreground'
                   }`}
                 >
-                  Profiles ({hotspotProfiles.length})
+                  Profil ({hotspotProfiles.length})
                 </button>
               </div>
 
@@ -346,7 +346,7 @@ export default function AdminRouter() {
               {/* Active Sessions Tab */}
               {activeTab === 'sessions' && (
                 <div className="stat-card">
-                  <h3 className="font-semibold text-foreground mb-4">Active Sessions</h3>
+                  <h3 className="font-semibold text-foreground mb-4">Sesi Aktif</h3>
                   {activeSessions.length === 0 ? (
                     <p className="text-muted-foreground text-center py-8">Tidak ada sesi aktif</p>
                   ) : (
@@ -354,13 +354,13 @@ export default function AdminRouter() {
                       <table className="w-full">
                         <thead>
                           <tr className="border-b border-border">
-                            <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">User</th>
-                            <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">IP Address</th>
-                            <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">MAC Address</th>
-                            <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Uptime</th>
-                            <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Download</th>
-                            <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Upload</th>
-                            <th className="text-right py-3 px-4 text-sm font-medium text-muted-foreground">Action</th>
+                            <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Pengguna</th>
+                            <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Alamat IP</th>
+                            <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Alamat MAC</th>
+                            <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Durasi</th>
+                            <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Unduhan</th>
+                            <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Unggahan</th>
+                            <th className="text-right py-3 px-4 text-sm font-medium text-muted-foreground">Aksi</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -378,7 +378,7 @@ export default function AdminRouter() {
                                   disabled={isDisconnecting === session.user}
                                   className="px-3 py-1 text-sm bg-destructive/10 text-destructive rounded-lg hover:bg-destructive/20 disabled:opacity-50"
                                 >
-                                  {isDisconnecting === session.user ? 'Disconnecting...' : 'Disconnect'}
+                                  {isDisconnecting === session.user ? 'Memutuskan...' : 'Putuskan'}
                                 </button>
                               </td>
                             </tr>
@@ -393,18 +393,18 @@ export default function AdminRouter() {
               {/* Hotspot Users Tab */}
               {activeTab === 'users' && (
                 <div className="stat-card">
-                  <h3 className="font-semibold text-foreground mb-4">Hotspot Users</h3>
+                  <h3 className="font-semibold text-foreground mb-4">Pengguna Hotspot</h3>
                   {hotspotUsers.length === 0 ? (
-                    <p className="text-muted-foreground text-center py-8">Tidak ada user</p>
+                    <p className="text-muted-foreground text-center py-8">Tidak ada pengguna</p>
                   ) : (
                     <div className="overflow-x-auto">
                       <table className="w-full">
                         <thead>
                           <tr className="border-b border-border">
-                            <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Username</th>
-                            <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Profile</th>
-                            <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">MAC Address</th>
-                            <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Comment</th>
+                            <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Nama Pengguna</th>
+                            <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Profil</th>
+                            <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Alamat MAC</th>
+                            <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Keterangan</th>
                             <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Status</th>
                           </tr>
                         </thead>
@@ -419,7 +419,7 @@ export default function AdminRouter() {
                               <td className="py-3 px-4 text-sm text-muted-foreground">{user.comment || '-'}</td>
                               <td className="py-3 px-4">
                                 <Badge variant={user.disabled === 'false' ? 'success' : 'destructive'}>
-                                  {user.disabled === 'false' ? 'Enabled' : 'Disabled'}
+                                  {user.disabled === 'false' ? 'Aktif' : 'Nonaktif'}
                                 </Badge>
                               </td>
                             </tr>
@@ -434,17 +434,17 @@ export default function AdminRouter() {
               {/* Profiles Tab */}
               {activeTab === 'profiles' && (
                 <div className="stat-card">
-                  <h3 className="font-semibold text-foreground mb-4">Hotspot Profiles</h3>
+                  <h3 className="font-semibold text-foreground mb-4">Profil Hotspot</h3>
                   {hotspotProfiles.length === 0 ? (
-                    <p className="text-muted-foreground text-center py-8">Tidak ada profile</p>
+                    <p className="text-muted-foreground text-center py-8">Tidak ada profil</p>
                   ) : (
                     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                       {hotspotProfiles.map((profile) => (
                         <div key={profile['.id']} className="bg-secondary rounded-xl p-4">
                           <h4 className="font-semibold text-foreground mb-2">{profile.name}</h4>
                           <div className="space-y-1 text-sm text-muted-foreground">
-                            <p>Shared Users: {profile['shared-users']}</p>
-                            {profile['rate-limit'] && <p>Rate Limit: {profile['rate-limit']}</p>}
+                            <p>Pengguna bersama: {profile['shared-users']}</p>
+                            {profile['rate-limit'] && <p>Batas kecepatan: {profile['rate-limit']}</p>}
                           </div>
                         </div>
                       ))}
@@ -479,10 +479,10 @@ export default function AdminRouter() {
               <div className="w-10 h-10 rounded-full bg-destructive/10 flex items-center justify-center">
                 <AlertTriangle className="w-5 h-5 text-destructive" />
               </div>
-              <h2 className="text-lg font-semibold text-foreground">Putuskan Koneksi User?</h2>
+              <h2 className="text-lg font-semibold text-foreground">Putuskan Koneksi Pengguna?</h2>
             </div>
             <p className="text-muted-foreground mb-6">
-              User <strong>{selectedSession.user}</strong> dengan IP <strong>{selectedSession.address}</strong> akan diputuskan dari jaringan.
+              Pengguna <strong>{selectedSession.user}</strong> dengan IP <strong>{selectedSession.address}</strong> akan diputus dari jaringan.
             </p>
             <div className="flex gap-3 justify-end">
               <button

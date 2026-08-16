@@ -28,7 +28,7 @@ export default function AdminLogin() {
       // Navigate to admin panel
       navigate('/admin');
     } catch (err: unknown) {
-      setError(getErrorMessage(err, 'Login gagal. Periksa email dan password Anda.'));
+        setError(getErrorMessage(err, 'Gagal masuk. Periksa email dan kata sandi Anda.'));
     } finally {
       setIsLoading(false);
     }
@@ -50,8 +50,8 @@ export default function AdminLogin() {
               <Wifi className="w-6 h-6 text-primary-foreground" />
             </div>
             <div>
-              <h1 className="text-xl font-bold text-foreground">Admin Panel</h1>
-              <p className="text-sm text-muted-foreground">HotSpot Portal</p>
+              <h1 className="text-xl font-bold text-foreground">Panel Admin</h1>
+              <p className="text-sm text-muted-foreground">Hotspot Portal</p>
             </div>
           </div>
 
@@ -82,7 +82,7 @@ export default function AdminLogin() {
                       type="email"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      placeholder="admin@hotspot.local"
+                      placeholder="nama@perusahaan.com"
                       className="w-full h-12 pl-12 pr-4 rounded-xl bg-secondary border-0 text-foreground placeholder:text-muted-foreground focus:ring-2 focus:ring-primary"
                       required
                     />
@@ -91,7 +91,7 @@ export default function AdminLogin() {
 
                 <div>
                   <label className="block text-sm font-medium text-foreground mb-2">
-                    Password
+                    Kata Sandi
                   </label>
                   <div className="relative">
                     <Lock className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" />
@@ -99,7 +99,7 @@ export default function AdminLogin() {
                       type={showPassword ? 'text' : 'password'}
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      placeholder="Masukkan password"
+                      placeholder="Masukkan kata sandi"
                       className="w-full h-12 pl-12 pr-12 rounded-xl bg-secondary border-0 text-foreground placeholder:text-muted-foreground focus:ring-2 focus:ring-primary"
                       required
                     />
@@ -113,15 +113,9 @@ export default function AdminLogin() {
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between text-sm">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input type="checkbox" className="w-4 h-4 rounded border-border text-primary focus:ring-primary" />
-                    <span className="text-muted-foreground">Ingat saya</span>
-                  </label>
-                  <button type="button" className="text-primary font-medium hover:underline">
-                    Lupa password?
-                  </button>
-                </div>
+                <p className="text-xs text-muted-foreground">
+                  Hubungi administrator sistem jika Anda lupa kata sandi.
+                </p>
 
                 <button
                   type="submit"
@@ -139,9 +133,6 @@ export default function AdminLogin() {
                 </button>
               </form>
 
-              <p className="text-center text-sm text-muted-foreground mt-6">
-                Demo: <span className="font-mono text-primary">admin@hotspot.local</span> / <span className="font-mono text-primary">admin123</span>
-              </p>
             </div>
           </div>
         </div>
@@ -178,7 +169,7 @@ export default function AdminLogin() {
             HotSpot Portal
           </h2>
           <p className="text-xl text-white/80 max-w-md mx-auto">
-            Kelola WiFi publik dengan mudah, pantau pengguna, dan generate voucher dalam satu dashboard.
+            Kelola WiFi publik, pantau pengguna, dan buat voucher dalam satu dasbor.
           </p>
         </div>
       </div>

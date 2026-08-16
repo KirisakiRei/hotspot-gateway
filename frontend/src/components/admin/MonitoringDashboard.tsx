@@ -191,7 +191,7 @@ function MonitoringDashboardInner({ isConnected }: MonitoringDashboardProps) {
         <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 flex items-center gap-3">
           <AlertTriangle className="w-5 h-5 text-yellow-600" />
           <p className="text-sm text-yellow-800">
-            Real-time streaming tidak tersedia. Menggunakan mode polling (update setiap 10 detik).
+            Pembaruan langsung tidak tersedia. Data diperbarui setiap 10 detik.
           </p>
         </div>
       )}
@@ -209,13 +209,13 @@ function MonitoringDashboardInner({ isConnected }: MonitoringDashboardProps) {
                   : 'bg-gray-100 text-gray-700'
             }`}>
               <Radio className={`w-3 h-3 ${mode === 'streaming' ? 'animate-pulse' : ''}`} />
-              {mode === 'streaming' ? 'Live' : mode === 'polling' ? 'Polling' : 'Offline'}
+              {mode === 'streaming' ? 'Langsung' : mode === 'polling' ? 'Berkala' : 'Tidak terhubung'}
             </span>
           </div>
           {displayLastUpdate && (
             <p className="text-sm text-gray-500 flex items-center gap-1 mt-1">
               <Clock className="w-4 h-4" />
-              Last update: {displayLastUpdate.toLocaleTimeString()}
+              Pembaruan terakhir: {displayLastUpdate.toLocaleTimeString('id-ID')}
             </p>
           )}
         </div>
@@ -232,7 +232,7 @@ function MonitoringDashboardInner({ isConnected }: MonitoringDashboardProps) {
       {/* System Overview */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatsCard
-          title="CPU Load"
+          title="Beban CPU"
           value={`${system.cpuLoad || 0}%`}
           icon={Cpu}
           description={system.boardName || 'N/A'}
@@ -251,7 +251,7 @@ function MonitoringDashboardInner({ isConnected }: MonitoringDashboardProps) {
           title="System Uptime"
           value={formatUptime(system.uptime || '0s')}
           icon={Activity}
-          description={`RouterOS ${system.version || 'N/A'}`}
+          description={`Versi perangkat ${system.version || '-'}`}
           color="info"
         />
         
@@ -317,7 +317,7 @@ function MonitoringDashboardInner({ isConnected }: MonitoringDashboardProps) {
             <p className="text-2xl font-bold text-gray-900">
               {(iface.rxError || 0) + (iface.txError || 0)}
             </p>
-            <p className="text-xs text-gray-500 mt-1">RX: {iface.rxError || 0} / TX: {iface.txError || 0}</p>
+            <p className="text-xs text-gray-500 mt-1">Masuk: {iface.rxError || 0} / Keluar: {iface.txError || 0}</p>
           </div>
 
           <div className="bg-gray-50 rounded-lg p-4">
@@ -332,7 +332,7 @@ function MonitoringDashboardInner({ isConnected }: MonitoringDashboardProps) {
                 <span className="text-red-600">Offline</span>
               )}
             </p>
-            <p className="text-xs text-gray-500 mt-1">Drops: {(iface.rxDrop || 0) + (iface.txDrop || 0)}</p>
+            <p className="text-xs text-gray-500 mt-1">Paket terbuang: {(iface.rxDrop || 0) + (iface.txDrop || 0)}</p>
           </div>
         </div>
       </div>
@@ -370,7 +370,7 @@ function MonitoringDashboardInner({ isConnected }: MonitoringDashboardProps) {
             </table>
             {sessions.sessions.length > 10 && (
               <p className="text-sm text-gray-500 text-center mt-4">
-                Showing 10 of {sessions.totalSessions || 0} active sessions
+                Menampilkan 10 dari {sessions.totalSessions || 0} sesi aktif
               </p>
             )}
           </div>

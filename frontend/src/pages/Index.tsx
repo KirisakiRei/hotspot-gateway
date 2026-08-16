@@ -67,7 +67,7 @@ const Index = () => {
       {/* Footer */}
       <footer className="p-6 text-center relative z-10">
         <p className="text-sm text-muted-foreground">
-          © 2024 HotSpot Portal System
+          © 2026 Hotspot Portal
         </p>
       </footer>
     </div>

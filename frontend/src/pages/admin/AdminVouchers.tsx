@@ -216,7 +216,7 @@ export default function AdminVouchers() {
       if (errorMessage.includes('vouchers are using')) {
         toast.error(errorMessage);
       } else if (errorMessage.includes('Mikrotik')) {
-        toast.error(`Koneksi Mikrotik error: ${errorMessage}`);
+        toast.error(`Koneksi MikroTik gagal. ${errorMessage}`);
       } else if (errorMessage.includes('not found') || errorMessage.includes('No record')) {
         // Profile already deleted (by another request), just close and reload
         toast.info('Profil sudah terhapus');
@@ -241,11 +241,11 @@ export default function AdminVouchers() {
     
     try {
       const response = await voucherApi.generate(generateSettings);
-      toast.success(`Berhasil generate ${response.data.data!.length} voucher`);
+      toast.success(`Berhasil membuat ${response.data.data!.length} voucher`);
       await loadData();
       closeModal();
     } catch (error: unknown) {
-      toast.error(getErrorMessage(error, 'Gagal generate voucher'));
+      toast.error(getErrorMessage(error, 'Gagal membuat voucher'));
     }
   };
 
@@ -284,7 +284,7 @@ export default function AdminVouchers() {
       });
       
       if (response.ok) {
-        toast.success('Voucher settings berhasil disimpan');
+        toast.success('Pengaturan voucher berhasil disimpan');
       } else {
         toast.error('Gagal menyimpan settings');
       }
@@ -360,15 +360,15 @@ export default function AdminVouchers() {
       <AdminSidebar />
       
       <main className="admin-content">
-        <AdminHeader title="Voucher Management" subtitle="Generate and configure voucher profiles" />
+        <AdminHeader title="Manajemen Voucher" subtitle="Buat dan atur profil voucher" />
         
         <div className="p-6 space-y-6 animate-fade-in">
           {/* Voucher Profiles */}
           <div className="stat-card">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="font-semibold text-foreground">Voucher Profiles</h2>
+              <h2 className="font-semibold text-foreground">Profil Voucher</h2>
               <ActionButton variant="primary" icon={Plus} onClick={openAddModal}>
-                Add Profile
+                Tambah Profil
               </ActionButton>
             </div>
 
@@ -379,15 +379,15 @@ export default function AdminVouchers() {
                   <h3 className="font-semibold text-foreground mb-3 pr-6">{profile.name}</h3>
                   <div className="space-y-2 text-sm">
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">Duration</span>
+                      <span className="text-muted-foreground">Durasi</span>
                       <span className="text-foreground">{formatDuration(profile.duration)}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">Quota</span>
+                      <span className="text-muted-foreground">Kuota</span>
                       <span className="text-foreground">{formatQuota(profile.quota)}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">Price</span>
+                      <span className="text-muted-foreground">Harga</span>
                       <span className="text-foreground font-medium">{formatPrice(profile.price)}</span>
                     </div>
                   </div>
@@ -415,15 +415,15 @@ export default function AdminVouchers() {
           <div className="stat-card">
             <div className="flex items-center justify-between mb-4">
               <div>
-                <h2 className="font-semibold text-foreground">Generate Vouchers Settings</h2>
-                <p className="text-sm text-muted-foreground mt-1">Konfigurasi untuk auto-generate voucher via WhatsApp</p>
+                <h2 className="font-semibold text-foreground">Pengaturan Pembuatan Voucher</h2>
+                <p className="text-sm text-muted-foreground mt-1">Pengaturan pembuatan voucher otomatis melalui WhatsApp</p>
               </div>
               <button 
                 onClick={() => setShowGenerator(!showGenerator)}
                 className="text-primary text-sm font-medium hover:underline flex items-center gap-1"
               >
                 <Settings className="w-4 h-4" />
-                {showGenerator ? 'Hide' : 'Show'} Options
+                {showGenerator ? 'Sembunyikan' : 'Tampilkan'} opsi
               </button>
             </div>
 
@@ -433,10 +433,10 @@ export default function AdminVouchers() {
                   <div className="flex items-start gap-3">
                     <Send className="w-5 h-5 text-primary mt-0.5" />
                     <div>
-                      <h4 className="font-medium text-foreground">Auto Generate via WhatsApp</h4>
+                      <h4 className="font-medium text-foreground">Pembuatan otomatis melalui WhatsApp</h4>
                       <p className="text-sm text-muted-foreground mt-1">
-                        Voucher akan di-generate otomatis dan dikirim ke WhatsApp user setelah mereka mengisi form di portal login.
-                        Settings di bawah ini menentukan format voucher yang akan digenerate.
+                        Voucher akan dibuat otomatis dan dikirim ke WhatsApp pengguna setelah mereka mengisi formulir di portal.
+                        Pengaturan di bawah ini menentukan format kode voucher.
                       </p>
                     </div>
                   </div>
@@ -444,58 +444,58 @@ export default function AdminVouchers() {
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-foreground mb-2">Default Profile</label>
+                    <label className="block text-sm font-medium text-foreground mb-2">Profil default</label>
                     <select 
                       value={generateSettings.profileId}
                       onChange={(e) => setGenerateSettings(prev => ({ ...prev, profileId: e.target.value }))}
                       className="w-full h-10 px-3 rounded-xl bg-secondary border-0 text-sm"
                     >
-                      <option value="">-- Select Profile --</option>
+                      <option value="">-- Pilih profil --</option>
                       {profiles.map(p => (
                         <option key={p.id} value={p.id}>{p.name}</option>
                       ))}
                     </select>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-foreground mb-2">Prefix (optional)</label>
+                    <label className="block text-sm font-medium text-foreground mb-2">Awalan (opsional)</label>
                     <input
                       type="text"
                       maxLength={3}
                       value={generateSettings.prefix}
                       onChange={(e) => setGenerateSettings(prev => ({ ...prev, prefix: e.target.value.toUpperCase() }))}
-                      placeholder="e.g. VIP"
+                      placeholder="contoh: VIP"
                       className="w-full h-10 px-3 rounded-xl bg-secondary border-0 text-sm focus:ring-2 focus:ring-primary"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-foreground mb-2">Code Format</label>
+                    <label className="block text-sm font-medium text-foreground mb-2">Format kode</label>
                     <select 
                       value={generateSettings.format}
                       onChange={(e) => setGenerateSettings(prev => ({ ...prev, format: e.target.value as 'number' | 'text' | 'mixed' | 'mixed_upper' }))}
                       className="w-full h-10 px-3 rounded-xl bg-secondary border-0 text-sm"
                     >
-                      <option value="number">Random Number</option>
-                      <option value="text">Random Text (Uppercase)</option>
-                      <option value="mixed">Number + Text</option>
-                      <option value="mixed_upper">Number + Text (Uppercase)</option>
+                      <option value="number">Angka acak</option>
+                      <option value="text">Huruf acak (kapital)</option>
+                      <option value="mixed">Angka dan huruf</option>
+                      <option value="mixed_upper">Angka dan huruf (kapital)</option>
                     </select>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-foreground mb-2">Code Length</label>
+                    <label className="block text-sm font-medium text-foreground mb-2">Panjang kode</label>
                     <select 
                       value={generateSettings.length}
                       onChange={(e) => setGenerateSettings(prev => ({ ...prev, length: Number(e.target.value) }))}
                       className="w-full h-10 px-3 rounded-xl bg-secondary border-0 text-sm"
                     >
-                      <option value={4}>4 characters</option>
-                      <option value={6}>6 characters</option>
-                      <option value={8}>8 characters</option>
-                      <option value={10}>10 characters</option>
-                      <option value={12}>12 characters</option>
+                      <option value={4}>4 karakter</option>
+                      <option value={6}>6 karakter</option>
+                      <option value={8}>8 karakter</option>
+                      <option value={10}>10 karakter</option>
+                      <option value={12}>12 karakter</option>
                     </select>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-foreground mb-2">Preview</label>
+                    <label className="block text-sm font-medium text-foreground mb-2">Pratinjau</label>
                     <div className="h-10 px-3 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center">
                       <span className="font-mono text-primary font-medium">
                         {generateSettings.prefix}{generateVoucherPreview(generateSettings.format, generateSettings.length)}
@@ -506,7 +506,7 @@ export default function AdminVouchers() {
 
                 <div className="flex justify-end">
                   <ActionButton variant="primary" icon={Settings} onClick={saveVoucherSettings}>
-                    Save Settings
+                    Simpan Pengaturan
                   </ActionButton>
                 </div>
               </div>
@@ -515,16 +515,16 @@ export default function AdminVouchers() {
 
           {/* Voucher Settings Card */}
           <div className="stat-card">
-            <h2 className="font-semibold text-foreground mb-4">Voucher Settings</h2>
+            <h2 className="font-semibold text-foreground mb-4">Pengaturan Voucher</h2>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-4">
-                <h3 className="text-sm font-medium text-foreground">General Settings</h3>
+                <h3 className="text-sm font-medium text-foreground">Pengaturan umum</h3>
                 
                 <div className="flex items-center justify-between bg-secondary rounded-xl p-4">
                   <div>
-                    <p className="font-medium text-foreground">Auto-expire unused vouchers</p>
-                    <p className="text-sm text-muted-foreground">Delete vouchers after 30 days if unused</p>
+                    <p className="font-medium text-foreground">Hapus otomatis voucher yang tidak terpakai</p>
+                    <p className="text-sm text-muted-foreground">Voucher yang tidak dipakai akan dihapus setelah 30 hari</p>
                   </div>
                   <label className="relative inline-flex items-center cursor-pointer">
                     <input type="checkbox" defaultChecked className="sr-only peer" />
@@ -597,7 +597,7 @@ export default function AdminVouchers() {
                   type="text"
                   value={formData.name || ''}
                   onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                  placeholder="e.g. 1 Jam - 500MB"
+                  placeholder="contoh: 1 Jam - 500MB"
                   className="w-full h-10 px-3 rounded-xl bg-secondary border-0 text-sm focus:ring-2 focus:ring-primary"
                 />
               </div>

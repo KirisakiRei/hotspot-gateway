@@ -23,7 +23,7 @@ export function ConnectedScreen() {
   };
 
   const handleDisconnect = async () => {
-    if (confirm('Apakah Anda yakin ingin disconnect dari internet?')) {
+    if (confirm('Apakah Anda yakin ingin memutus koneksi internet?')) {
       await disconnectSession();
     }
   };
@@ -53,13 +53,13 @@ export function ConnectedScreen() {
   };
 
   const calculateTimeRemaining = () => {
-    if (!state.session?.expiresAt) return 'N/A';
+    if (!state.session?.expiresAt) return '-';
     
     const now = new Date();
     const expires = new Date(state.session.expiresAt);
     const diff = expires.getTime() - now.getTime();
     
-    if (diff <= 0) return 'Expired';
+    if (diff <= 0) return 'Habis';
     
     const hours = Math.floor(diff / (1000 * 60 * 60));
     const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
@@ -160,15 +160,15 @@ export function ConnectedScreen() {
             <h3 className="text-sm font-medium text-foreground mb-3">Status Koneksi</h3>
             <div className="space-y-2">
               <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">IP Address</span>
+                <span className="text-muted-foreground">Alamat IP</span>
                 <span className="font-medium text-foreground">{state.session.ip}</span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">MAC Address</span>
+                <span className="text-muted-foreground">Alamat Perangkat</span>
                 <span className="font-mono text-xs font-medium text-foreground">{state.session.mac}</span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Username</span>
+                <span className="text-muted-foreground">Nama Pengguna</span>
                 <span className="font-medium text-foreground">{state.session.username}</span>
               </div>
               <div className="flex justify-between text-sm">
@@ -215,8 +215,8 @@ export function ConnectedScreen() {
         {/* Instructions */}
         <div className="bg-muted/30 rounded-xl p-4 mb-6">
           <p className="text-sm text-muted-foreground text-center">
-            Browser ini akan tetap terbuka selama Anda terhubung ke internet. 
-            Anda dapat minimize dan membuka tab baru untuk browsing.
+            Halaman ini dapat tetap terbuka selama Anda terhubung ke internet.
+            Anda dapat mengecilkannya dan membuka tab baru.
           </p>
         </div>
 
@@ -233,12 +233,12 @@ export function ConnectedScreen() {
             {state.loading ? (
               <>
                 <Loader2 className="w-5 h-5 animate-spin" />
-                Disconnecting...
+                Memutuskan...
               </>
             ) : (
               <>
                 <LogOut className="w-5 h-5" />
-                Disconnect
+                Putuskan Koneksi
               </>
             )}
           </button>
@@ -249,7 +249,7 @@ export function ConnectedScreen() {
               href={state.deviceInfo.linkOrig}
               className="btn-primary w-full flex items-center justify-center gap-2"
             >
-              Lanjut Browsing
+              Lanjutkan Menjelajah
             </a>
           )}
         </div>

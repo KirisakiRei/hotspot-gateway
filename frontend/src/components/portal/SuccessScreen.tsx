@@ -2,7 +2,9 @@ import { CheckCircle2, Wifi } from 'lucide-react';
 
 export function SuccessScreen() {
   const handleBrowse = () => {
-    window.location.href = 'https://google.com';
+    const params = new URLSearchParams(window.location.search);
+    const origin = params.get('link-orig') || params.get('dst') || '/';
+    window.location.href = origin;
   };
 
   return (
@@ -23,7 +25,7 @@ export function SuccessScreen() {
 
         {/* Success Message */}
         <h1 className="text-2xl font-bold text-foreground text-center mb-3">
-          Internet Aktif 🎉
+          Internet Aktif
         </h1>
         <p className="text-muted-foreground text-center mb-4 max-w-xs">
           Selamat! Anda sekarang terhubung ke jaringan WiFi gratis
@@ -41,7 +43,7 @@ export function SuccessScreen() {
           onClick={handleBrowse}
           className="btn-primary w-full"
         >
-          Mulai Browsing
+          Mulai Menjelajah
         </button>
       </div>
     </div>

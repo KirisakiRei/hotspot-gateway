@@ -349,13 +349,13 @@ export function PortalProvider({ children }: { children: ReactNode }) {
           loading: false 
         }));
       } else {
-        throw new Error('No active advertisement found');
+        throw new Error('Tidak ada iklan aktif saat ini');
       }
     } catch (error) {
       const errorMsg = handleApiError(error);
       setState(prev => ({ ...prev, error: errorMsg, loading: false }));
       toast({
-        title: 'Error',
+        title: 'Gagal',
         description: errorMsg,
         variant: 'destructive',
       });
@@ -417,8 +417,8 @@ export function PortalProvider({ children }: { children: ReactNode }) {
         });
 
         toast({
-          title: 'Success',
-          description: response.data.data.message || 'Voucher sent to your WhatsApp',
+          title: 'Berhasil',
+          description: response.data.data.message || 'Kode voucher telah dikirim ke WhatsApp',
         });
 
         setStep('voucher');
@@ -427,13 +427,7 @@ export function PortalProvider({ children }: { children: ReactNode }) {
       const errorMsg = handleApiError(error);
       
       // Log detailed error for debugging
-      console.error('🔴 Request Voucher Failed:', {
-        error: errorMsg,
-        phone: state.phoneNumber,
-        mac: state.deviceInfo.mac,
-        ip: state.deviceInfo.ip,
-        rawError: error,
-      });
+      console.error('Request voucher failed');
       
       setState(prev => ({ ...prev, error: errorMsg, loading: false }));
       
@@ -473,7 +467,7 @@ export function PortalProvider({ children }: { children: ReactNode }) {
         }));
 
         toast({
-          title: 'Success',
+          title: 'Berhasil',
           description: 'Kode baru telah dikirim ke WhatsApp. Kode lama sudah dinonaktifkan.',
         });
       }
@@ -481,7 +475,7 @@ export function PortalProvider({ children }: { children: ReactNode }) {
       const errorMsg = handleApiError(error);
       setState(prev => ({ ...prev, error: errorMsg, loading: false }));
       toast({
-        title: 'Error',
+        title: 'Gagal',
         description: errorMsg,
         variant: 'destructive',
       });
@@ -502,8 +496,8 @@ export function PortalProvider({ children }: { children: ReactNode }) {
         setState(prev => ({ ...prev, loading: false }));
 
         toast({
-          title: 'Success',
-          description: response.data.data?.message || 'Voucher redeemed successfully',
+          title: 'Berhasil',
+          description: response.data.data?.message || 'Voucher berhasil digunakan',
         });
 
         setStep('success');
@@ -512,7 +506,7 @@ export function PortalProvider({ children }: { children: ReactNode }) {
       const errorMsg = handleApiError(error);
       setState(prev => ({ ...prev, error: errorMsg, loading: false }));
       toast({
-        title: 'Error',
+        title: 'Gagal',
         description: errorMsg,
         variant: 'destructive',
       });
@@ -541,8 +535,8 @@ export function PortalProvider({ children }: { children: ReactNode }) {
         }));
 
         toast({
-          title: 'Connecting...',
-          description: 'Redirecting to login page',
+          title: 'Menghubungkan...',
+          description: 'Mengarahkan ke halaman masuk',
         });
 
         // IMPORTANT: Redirect to Mikrotik login URL for actual session creation
@@ -665,8 +659,8 @@ export function PortalProvider({ children }: { children: ReactNode }) {
         }));
 
         toast({
-          title: 'Disconnected',
-          description: response.data.data?.message || 'You have been disconnected',
+          title: 'Terputus',
+          description: response.data.data?.message || 'Koneksi internet telah diputus',
         });
 
         // Reset to video screen
@@ -676,7 +670,7 @@ export function PortalProvider({ children }: { children: ReactNode }) {
       const errorMsg = handleApiError(error);
       setState(prev => ({ ...prev, error: errorMsg, loading: false }));
       toast({
-        title: 'Error',
+        title: 'Gagal',
         description: errorMsg,
         variant: 'destructive',
       });

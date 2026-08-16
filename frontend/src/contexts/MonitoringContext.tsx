@@ -234,12 +234,12 @@ export function MonitoringProvider({ children }: MonitoringProviderProps) {
 
     socket.on('stream:error', (errorData) => {
       console.error('Stream error:', errorData);
-      setError(errorData.message || 'Stream error occurred');
+      setError(errorData.message || 'Gagal memperbarui data pemantauan');
     });
 
     socket.on('error', (errorData) => {
       console.error('Socket error:', errorData);
-      setError(errorData.message || 'Connection error');
+      setError(errorData.message || 'Koneksi pemantauan terputus');
     });
 
     socket.on('disconnect', (reason) => {
@@ -249,7 +249,7 @@ export function MonitoringProvider({ children }: MonitoringProviderProps) {
       if (reason === 'io server disconnect') {
         // Server disconnected us - don't reconnect
         setMode('disconnected');
-        setError('Disconnected by server');
+        setError('Terputus dari server');
       }
     });
 
@@ -261,7 +261,7 @@ export function MonitoringProvider({ children }: MonitoringProviderProps) {
     socket.on('reconnect_failed', () => {
       console.log('❌ Reconnection failed, switching to polling mode');
       setMode('polling');
-      setError('WebSocket unavailable, using polling mode');
+      setError('Pembaruan langsung tidak tersedia. Data diperbarui secara berkala.');
       startPolling();
     });
 

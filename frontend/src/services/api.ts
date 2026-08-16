@@ -662,7 +662,7 @@ export const logApi = {
 // ==========================================
 
 export const handleApiError = (error: unknown): string => {
-  return getErrorMessage(error, 'An unexpected error occurred');
+  return getErrorMessage(error, 'Terjadi gangguan. Silakan coba lagi.');
 };
 
 export { api };

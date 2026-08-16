@@ -112,16 +112,22 @@ export default function AdminOverview() {
         USED: 'warning',
         EXPIRED: 'destructive',
       };
-      return <Badge variant={variantMap[v.status]}>{v.status}</Badge>;
+      const statusLabel: Record<RecentVoucher['status'], string> = {
+        UNUSED: 'Belum dipakai',
+        ACTIVE: 'Aktif',
+        USED: 'Terpakai',
+        EXPIRED: 'Kadaluarsa',
+      };
+      return <Badge variant={variantMap[v.status]}>{statusLabel[v.status]}</Badge>;
     }},
-    { key: 'user', label: 'User', render: (v: RecentVoucher) => v.users?.[0]?.name || '-' },
+    { key: 'user', label: 'Pengguna', render: (v: RecentVoucher) => v.users?.[0]?.name || '-' },
     { key: 'createdAt', label: 'Dibuat', render: (v: RecentVoucher) => formatDistanceToNow(new Date(v.createdAt), { addSuffix: true, locale: id }) },
   ];
 
   const logColumns = [
     { key: 'type', label: 'Tipe', render: (log: RecentLog) => <Badge variant="default">{log.type}</Badge> },
     { key: 'action', label: 'Aksi' },
-    { key: 'admin', label: 'Admin', render: (log: RecentLog) => log.admin?.name || 'System' },
+    { key: 'admin', label: 'Admin', render: (log: RecentLog) => log.admin?.name || 'Sistem' },
     { key: 'createdAt', label: 'Waktu', render: (log: RecentLog) => formatDistanceToNow(new Date(log.createdAt), { addSuffix: true, locale: id }) },
   ];
 
@@ -130,14 +136,14 @@ export default function AdminOverview() {
       <AdminSidebar />
       
       <main className="admin-content">
-        <AdminHeader title="Dashboard" subtitle="Selamat datang kembali, Admin" />
+        <AdminHeader title="Dasbor" subtitle="Selamat datang kembali" />
         
         <div className="p-6 space-y-6 animate-fade-in">
           {/* Stats Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <StatCard 
               icon={Users} 
-              label="Total Users" 
+              label="Total Pengguna" 
               value={stats?.users.total.toString() || '0'}
             />
             <StatCard 
@@ -148,13 +154,13 @@ export default function AdminOverview() {
             />
             <StatCard 
               icon={Ticket} 
-              label="Total Vouchers" 
+              label="Total Voucher" 
               value={stats?.vouchers.total.toString() || '0'}
               iconBg="bg-warning/10"
             />
             <StatCard 
               icon={Eye} 
-              label="Views Iklan" 
+              label="Tayangan Iklan" 
               value={stats?.advertisements.totalViews.toString() || '0'}
               iconBg="bg-info/10"
             />
@@ -164,7 +170,7 @@ export default function AdminOverview() {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* User Stats */}
             <div className="stat-card">
-              <h3 className="text-sm font-medium text-foreground mb-4">Statistik User</h3>
+              <h3 className="text-sm font-medium text-foreground mb-4">Statistik Pengguna</h3>
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -241,7 +247,7 @@ export default function AdminOverview() {
             {/* Recent Users */}
             <div className="stat-card">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-sm font-medium text-foreground">User Terbaru</h3>
+                <h3 className="text-sm font-medium text-foreground">Pengguna Terbaru</h3>
                 <button 
                   onClick={() => navigate('/admin/users')}
                   className="text-sm text-primary hover:underline"
@@ -264,7 +270,7 @@ export default function AdminOverview() {
                     {recentUsers.length === 0 ? (
                       <tr>
                         <td colSpan={userColumns.length} className="text-center p-8 text-muted-foreground">
-                          Belum ada user
+                          Belum ada pengguna
                         </td>
                       </tr>
                     ) : (

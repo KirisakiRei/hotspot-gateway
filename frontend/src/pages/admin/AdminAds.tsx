@@ -294,7 +294,7 @@ export default function AdminAds() {
                 </div>
                 <div>
                   <p className="text-2xl font-bold">{ads.reduce((sum, a) => sum + getViews(a), 0)}</p>
-                  <p className="text-sm text-muted-foreground">Total Views</p>
+                  <p className="text-sm text-muted-foreground">Total Tayangan</p>
                 </div>
               </div>
             </div>
@@ -305,7 +305,7 @@ export default function AdminAds() {
                 </div>
                 <div>
                   <p className="text-2xl font-bold">{ads.reduce((sum, a) => sum + getCompletions(a), 0)}</p>
-                  <p className="text-sm text-muted-foreground">Completions</p>
+                  <p className="text-sm text-muted-foreground">Selesai Ditonton</p>
                 </div>
               </div>
             </div>
@@ -342,7 +342,7 @@ export default function AdminAds() {
                     <tr>
                       <td colSpan={8} className="text-center p-8 text-muted-foreground">
                         <Film className="w-12 h-12 mx-auto mb-3 opacity-30" />
-                        <p>Belum ada iklan. Tambah iklan pertama!</p>
+                        <p>Belum ada iklan. Tambahkan iklan pertama.</p>
                       </td>
                     </tr>
                   ) : (
