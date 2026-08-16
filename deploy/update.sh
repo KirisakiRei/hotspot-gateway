@@ -15,7 +15,7 @@ cd "$APP_DIR"
 sudo -u "$APP_USER" git pull --ff-only
 
 cd "$APP_DIR/backend"
-sudo -u "$APP_USER" bunx nest build
+sudo -u "$APP_USER" bun run build
 
 cd "$APP_DIR/frontend"
 sudo -u "$APP_USER" bun run build
