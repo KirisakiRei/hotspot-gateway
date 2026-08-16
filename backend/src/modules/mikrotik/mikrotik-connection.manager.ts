@@ -137,17 +137,17 @@ export class MikrotikConnectionManager implements OnModuleInit, OnModuleDestroy 
   // ==========================================
 
   async onModuleInit() {
-    this.logger.log('🔌 Attempting initial Mikrotik connection...');
+    this.logger.log('🔌 Checking initial Mikrotik connection...');
     try {
-      // Timeout agar router offline tidak menggantung bootstrap aplikasi
-      const connected = await this.connectWithTimeout(8000);
+      // Non-blocking quick check (3 detik) saat server start
+      const connected = await this.connectWithTimeout(3000);
       if (connected) {
         this.logger.log('✅ Initial Mikrotik connection successful');
       } else {
-        this.logger.warn('⚠️ Initial Mikrotik connection failed - will retry on demand');
+        this.logger.warn('⚠️ Mikrotik not connected at startup - web portal will run in offline-safe mode');
       }
     } catch (error: unknown) {
-      this.logger.warn(`⚠️ Initial Mikrotik connection error: ${getErrorMessage(error)} - will retry on demand`);
+      this.logger.warn(`⚠️ Mikrotik offline at startup: ${getErrorMessage(error)} - web portal will run in offline-safe mode`);
     }
   }
 
@@ -207,7 +207,7 @@ export class MikrotikConnectionManager implements OnModuleInit, OnModuleDestroy 
         user: username,
         password,
         port,
-        timeout: 30, // 30 seconds timeout
+        timeout: 5, // 5 seconds connection timeout (fail-fast agar tidak memblokir HTTP request web)
         keepalive: true,
       });
 
@@ -215,7 +215,7 @@ export class MikrotikConnectionManager implements OnModuleInit, OnModuleDestroy 
       const connectedMenu = (await Promise.race([
         this.queryApi.connect(),
         new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('Connection timeout (30s)')), 30000),
+          setTimeout(() => reject(new Error('Connection timeout (5s)')), 5000),
         ),
       ])) as RosApiMenu;
 
@@ -276,11 +276,11 @@ export class MikrotikConnectionManager implements OnModuleInit, OnModuleDestroy 
       this.queryApi = null;
       this.queryClient = null;
 
-      // Retry logic
-      if (this.connectionRetries < this.maxRetries) {
+      // Retry logic: max 1 retry with fast backoff
+      if (this.connectionRetries < 1) {
         this.connectionRetries++;
-        this.logger.log(`🔄 Retrying connection (${this.connectionRetries}/${this.maxRetries})...`);
-        await new Promise((resolve) => setTimeout(resolve, 2000)); // Wait 2 seconds
+        this.logger.log(`🔄 Retrying connection (${this.connectionRetries}/1)...`);
+        await new Promise((resolve) => setTimeout(resolve, 1000));
         this.connectionLock = false; // Release lock for retry
         return this.connect();
       }
@@ -587,7 +587,8 @@ export class MikrotikConnectionManager implements OnModuleInit, OnModuleDestroy 
       this.connectionRetries = 0;
       const connected = await this.connect();
       if (!connected) {
-        throw new Error('Failed to connect to Mikrotik after multiple attempts');
+        this.logger.warn('⚠️ Mikrotik unreachable, proceeding with offline-safe fallback');
+        throw new Error('Mikrotik router is unreachable');
       }
     }
 

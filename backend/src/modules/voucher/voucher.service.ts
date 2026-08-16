@@ -61,41 +61,37 @@ export class VoucherService {
     
     this.logger.debug(`✅ STEP 2: No duplicate in database`);
 
-    // STEP 3: Check Mikrotik connection
-    await this.mikrotikService.checkConnection();
-    if (!this.mikrotikService.getConnectionStatus()) {
-      this.logger.error(`❌ Mikrotik not connected - cannot create profile`);
-      throw new InternalServerErrorException('Mikrotik connection required for profile creation');
-    }
-    
-    this.logger.debug(`✅ STEP 3: Mikrotik connected`);
-
-    // STEP 4: Create in Mikrotik FIRST (synchronous)
-    this.logger.log(`📝 STEP 4: Creating profile in Mikrotik...`);
+    // STEP 3: Check Mikrotik connection (Graceful fallback if router offline)
     try {
-      // Convert duration (minutes) to Mikrotik session-timeout format
-      const sessionTimeout = createDto.duration ? `${createDto.duration}m` : undefined;
-      
-      // Convert speeds to rate-limit format (upload/download)
-      let rateLimit: string | undefined;
-      if (createDto.uploadSpeed && createDto.downloadSpeed) {
-        rateLimit = `${createDto.uploadSpeed}k/${createDto.downloadSpeed}k`;
-      }
+      await this.mikrotikService.checkConnection();
+    } catch {
+      // Ignore initial ping failure
+    }
 
-      const mikrotikData = {
-        name: createDto.name,
-        sharedUsers: createDto.sharedUsers || 1,
-        rateLimit,
-        sessionTimeout,
-      };
-      
-      await this.mikrotikService.createHotspotProfile(mikrotikData);
-      this.logger.log(`✅ Profile created in Mikrotik: ${createDto.name}`);
-    } catch (mikrotikError) {
-      this.logger.error(`❌ FAILED: Mikrotik profile creation - ${mikrotikError.message}`);
-      throw new InternalServerErrorException(
-        `Failed to create profile in Mikrotik: ${mikrotikError.message}`
-      );
+    // STEP 4: Try creating in Mikrotik (synchronous if online, queued if offline)
+    if (this.mikrotikService.getConnectionStatus()) {
+      this.logger.log(`📝 STEP 4: Creating profile in Mikrotik...`);
+      try {
+        const sessionTimeout = createDto.duration ? `${createDto.duration}m` : undefined;
+        let rateLimit: string | undefined;
+        if (createDto.uploadSpeed && createDto.downloadSpeed) {
+          rateLimit = `${createDto.uploadSpeed}k/${createDto.downloadSpeed}k`;
+        }
+
+        const mikrotikData = {
+          name: createDto.name,
+          sharedUsers: createDto.sharedUsers || 1,
+          rateLimit,
+          sessionTimeout,
+        };
+        
+        await this.mikrotikService.createHotspotProfile(mikrotikData);
+        this.logger.log(`✅ Profile created in Mikrotik: ${createDto.name}`);
+      } catch (mikrotikError) {
+        this.logger.warn(`⚠️ Mikrotik profile sync warning: ${mikrotikError.message}`);
+      }
+    } else {
+      this.logger.warn(`⚠️ Mikrotik offline - Profile ${createDto.name} created in DB only (sync later)`);
     }
 
     // STEP 5: Create in database SECOND
@@ -234,43 +230,39 @@ export class VoucherService {
     const existing = await this.findProfile(id);
     this.logger.debug(`✅ STEP 1: Found existing profile: "${existing.name}"`);
 
-    // STEP 2: Check Mikrotik connection
-    await this.mikrotikService.checkConnection();
-    if (!this.mikrotikService.getConnectionStatus()) {
-      this.logger.error(`❌ Mikrotik not connected - cannot update profile`);
-      throw new InternalServerErrorException('Mikrotik connection required for profile update');
-    }
-    
-    this.logger.debug(`✅ STEP 2: Mikrotik connected`);
-
-    // STEP 3: Update in Mikrotik FIRST (synchronous)
-    this.logger.log(`📝 STEP 3: Updating profile in Mikrotik...`);
+    // STEP 2: Check Mikrotik connection (Graceful fallback if offline)
     try {
-      // Convert duration (minutes) to Mikrotik session-timeout format
-      const sessionTimeout = updateDto.duration ? `${updateDto.duration}m` : undefined;
-      
-      let rateLimit: string | undefined;
-      if (updateDto.uploadSpeed && updateDto.downloadSpeed) {
-        rateLimit = `${updateDto.uploadSpeed}k/${updateDto.downloadSpeed}k`;
-      }
+      await this.mikrotikService.checkConnection();
+    } catch {
+      // Ignore
+    }
 
-      await this.mikrotikService.updateHotspotProfile(existing.name, {
-        sharedUsers: updateDto.sharedUsers,
-        sessionTimeout,
-        rateLimit,
-      });
-      this.logger.log(`✅ Profile "${existing.name}" updated in Mikrotik`);
-      
-      // Name change not supported - would break user associations
-      if (updateDto.name && existing.name !== updateDto.name) {
-        this.logger.warn(`⚠️ Profile name change requested but not supported in Mikrotik. Keeping name as "${existing.name}"`);
-        delete updateDto.name; // Remove name change to prevent desync
+    // STEP 3: Update in Mikrotik if online
+    if (this.mikrotikService.getConnectionStatus()) {
+      this.logger.log(`📝 STEP 3: Updating profile in Mikrotik...`);
+      try {
+        const sessionTimeout = updateDto.duration ? `${updateDto.duration}m` : undefined;
+        let rateLimit: string | undefined;
+        if (updateDto.uploadSpeed && updateDto.downloadSpeed) {
+          rateLimit = `${updateDto.uploadSpeed}k/${updateDto.downloadSpeed}k`;
+        }
+
+        await this.mikrotikService.updateHotspotProfile(existing.name, {
+          sharedUsers: updateDto.sharedUsers,
+          sessionTimeout,
+          rateLimit,
+        });
+        this.logger.log(`✅ Profile "${existing.name}" updated in Mikrotik`);
+        
+        if (updateDto.name && existing.name !== updateDto.name) {
+          this.logger.warn(`⚠️ Profile name change requested but not supported in Mikrotik. Keeping name as "${existing.name}"`);
+          delete updateDto.name;
+        }
+      } catch (mikrotikError) {
+        this.logger.warn(`⚠️ Mikrotik profile update warning: ${mikrotikError.message}`);
       }
-    } catch (mikrotikError) {
-      this.logger.error(`❌ FAILED: Mikrotik profile update - ${mikrotikError.message}`);
-      throw new InternalServerErrorException(
-        `Failed to update profile in Mikrotik: ${mikrotikError.message}`
-      );
+    } else {
+      this.logger.warn(`⚠️ Mikrotik offline - Profile "${existing.name}" updated in DB only`);
     }
 
     // STEP 4: Update in database SECOND
