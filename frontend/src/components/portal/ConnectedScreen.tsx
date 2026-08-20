@@ -89,7 +89,7 @@ export function ConnectedScreen() {
 
   return (
     <div className="fixed inset-0 bg-background flex flex-col animate-fade-in">
-      <PortalHeader currentStep={4} totalSteps={4} />
+      <PortalHeader currentStep={3} totalSteps={3} />
       
       <div className="flex-1 px-6 flex flex-col overflow-y-auto pb-6">
         {/* Success Header */}

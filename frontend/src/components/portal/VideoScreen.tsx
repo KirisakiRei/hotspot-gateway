@@ -6,7 +6,7 @@ import { usePortal } from '@/contexts/PortalContext';
 const BUFFER_STALL_TIMEOUT_MS = 12000;
 
 export function VideoScreen() {
-  const { state, trackAdView, trackAdComplete, claimFreeAccess, loadAdvertisement } = usePortal();
+  const { state, trackAdView, trackAdComplete, loadAdvertisement, setStep } = usePortal();
   const { advertisement, loading, error } = state;
 
   const [isPlaying, setIsPlaying] = useState(false);
@@ -17,7 +17,6 @@ export function VideoScreen() {
   const [stallBypass, setStallBypass] = useState(false);
   const [videoDuration, setVideoDuration] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
-  const [connecting, setConnecting] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const stallTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -52,7 +51,6 @@ export function VideoScreen() {
       setCurrentTime(0);
       setIsBuffering(false);
       setIsPlaying(false);
-      setConnecting(false);
       hasTrackedView.current = false;
       clearStallTimeout();
     }
@@ -124,10 +122,9 @@ export function VideoScreen() {
     }
   };
 
-  const handleConnect = async () => {
+  const handleContinue = () => {
     if (!isUnlocked || connecting) return;
 
-    // Traking
     if (!hasTrackedView.current) {
       trackAdView();
       hasTrackedView.current = true;
@@ -138,8 +135,7 @@ export function VideoScreen() {
       trackAdComplete(watchTime);
     }
 
-    setConnecting(true);
-    await claimFreeAccess();
+    setStep('connect');
   };
 
   const getVideoUrl = () => advertisement?.videoUrl || '';
@@ -278,23 +274,18 @@ export function VideoScreen() {
         </div>
 
         <button
-          onClick={handleConnect}
-          disabled={!isUnlocked || connecting}
+          onClick={handleContinue}
+          disabled={!isUnlocked}
           className={`w-full h-14 rounded-2xl text-base font-semibold transition-all flex items-center justify-center gap-2 ${
-            isUnlocked && !connecting
+            isUnlocked
               ? 'bg-primary text-primary-foreground hover:opacity-90'
               : 'bg-white/20 text-white/60'
           }`}
         >
-          {connecting ? (
-            <>
-              <Loader2 className="w-5 h-5 animate-spin" />
-              Menghubungkan...
-            </>
-          ) : isUnlocked ? (
+          {isUnlocked ? (
             <>
               <Wifi className="w-5 h-5" />
-              Hubungkan ke Internet
+              Lanjutkan
             </>
           ) : (
             `Tonton video sampai selesai (${remaining} detik)`

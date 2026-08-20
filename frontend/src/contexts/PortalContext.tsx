@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, ReactNode, useEffect } from
 import { advertisementApi, voucherApi, type Advertisement, type SessionInfo, type TrackAdRequest, type ClaimFreeVoucherResponse, handleApiError } from '@/services/api';
 import { useToast } from '@/hooks/use-toast';
 
-export type PortalStep = 'video' | 'connected';
+export type PortalStep = 'video' | 'connect' | 'connected';
 
 interface DeviceInfo {
   mac: string;
@@ -214,9 +214,14 @@ export function PortalProvider({ children }: { children: ReactNode }) {
             title: 'Menghubungkan...',
             description: 'Mengalihkan ke router',
           });
+          // Setelah PAP login berhasil, MikroTik redirect ke dst.
+          // Kita arahkan ke halaman portal status=connected agar user langsung
+          // melihat halaman "Terhubung" dengan sertifikat HTTPS yang valid
+          // (menghindari SSL warning dari sertifikat self-signed MikroTik).
+          const connectedUrl = `${window.location.origin}/portal?status=connected&mac=${encodeURIComponent(mac)}&ip=${encodeURIComponent(state.deviceInfo.ip || '')}`;
           submitNativeLoginForm(
             loginAction,
-            state.deviceInfo.linkOrig,
+            connectedUrl,
             data.credentials.username,
             data.credentials.password,
           );

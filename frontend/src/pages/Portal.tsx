@@ -1,12 +1,12 @@
 import { PortalProvider, usePortal } from '@/contexts/PortalContext';
 import { VideoScreen } from '@/components/portal/VideoScreen';
+import { ConnectScreen } from '@/components/portal/ConnectScreen';
 import { ConnectedScreen } from '@/components/portal/ConnectedScreen';
 import { Loader2 } from 'lucide-react';
 
 function PortalFlow() {
   const { state } = usePortal();
 
-  // Show loading screen while checking session
   if (state.checkingSession) {
     return (
       <div className="fixed inset-0 bg-background flex flex-col items-center justify-center">
@@ -19,6 +19,8 @@ function PortalFlow() {
   switch (state.currentStep) {
     case 'connected':
       return <ConnectedScreen />;
+    case 'connect':
+      return <ConnectScreen />;
     case 'video':
     default:
       return <VideoScreen />;
