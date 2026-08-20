@@ -231,6 +231,27 @@ export interface AuthenticateVoucherRequest {
   linkOrig?: string;
 }
 
+export interface ClaimFreeVoucherRequest {
+  mac: string;
+  ip?: string;
+  linkOrig?: string;
+}
+
+export interface ClaimFreeVoucherResponse {
+  success: boolean;
+  message: string;
+  alreadyConnected: boolean;
+  credentials: {
+    username: string;
+    password: string;
+  } | null;
+  profile?: {
+    name: string;
+    duration: number;
+  };
+  expiresAt?: string;
+}
+
 export interface CheckSessionRequest {
   mac: string;
 }
@@ -273,6 +294,7 @@ export const voucherApi = {
   request: (data: RequestVoucherRequest) => api.post<ApiResponse<{ voucher: Voucher; message: string }>>('/vouchers/request', data, { timeout: TIMEOUTS.SLOW, skipAuthRedirect: true }),
   resend: (data: RequestVoucherRequest) => api.post<ApiResponse<{ voucher: Voucher; message: string }>>('/vouchers/resend', data, { timeout: TIMEOUTS.SLOW, skipAuthRedirect: true }),
   redeem: (data: RedeemVoucherRequest) => api.post<ApiResponse<{ session: SessionInfo; message: string }>>('/vouchers/redeem', data, { timeout: TIMEOUTS.SLOW, skipAuthRedirect: true }),
+  claimFree: (data: ClaimFreeVoucherRequest) => api.post<ApiResponse<ClaimFreeVoucherResponse>>('/vouchers/claim-free', data, { timeout: TIMEOUTS.SLOW, skipAuthRedirect: true }),
   
   // Phase 3: Authentication endpoints - use SLOW for Mikrotik operations
   authenticate: (data: AuthenticateVoucherRequest) => api.post<ApiResponse<AuthenticateVoucherResponse>>('/vouchers/authenticate', data, { timeout: TIMEOUTS.SLOW, skipAuthRedirect: true }),
@@ -431,86 +453,6 @@ export interface MonitoringDashboard {
   interface: InterfaceStats;
   timestamp: string;
 }
-
-// ==========================================
-// WHATSAPP GATEWAY
-// ==========================================
-
-export interface WaSessionInfo {
-  id: string;
-  phone: string;
-  name: string | null;
-  active: boolean;
-  state: 'DISCONNECTED' | 'CONNECTING' | 'CONNECTED' | 'CLOSING';
-  sentCount: number;
-  paired: boolean;
-  qrAvailable: boolean;
-  pairedAt: string | null;
-  lastSeenAt: string | null;
-  lastError: string | null;
-}
-
-export interface WaStatus {
-  connected: boolean;
-  enabled: boolean;
-  roundRobinThreshold: number;
-  autoReconnect: boolean;
-  sessions: Array<{
-    phone: string;
-    name: string | null;
-    active: boolean;
-    state: WaSessionInfo['state'];
-    sentCount: number;
-    paired: boolean;
-    qrAvailable: boolean;
-    pairedAt: string | null;
-    lastSeenAt: string | null;
-    lastError: string | null;
-  }>;
-  totalSentToday: number;
-}
-
-export interface WaMessageLogRow {
-  id: string;
-  sessionPhone: string;
-  recipientPhone: string;
-  messageType: 'TEXT' | 'VOUCHER' | 'INCOMING';
-  message: string;
-  status: 'PENDING' | 'SENT' | 'FAILED' | 'RECEIVED' | 'REJECTED';
-  errorMessage: string | null;
-  voucherCode: string | null;
-  sentAt: string | null;
-  createdAt: string;
-}
-
-export const whatsappApi = {
-  getStatus: () => api.get<ApiResponse<WaStatus>>('/whatsapp/status'),
-  getConfig: () => api.get<ApiResponse<{ enabled: boolean; roundRobinThreshold: number; autoReconnect: boolean }>>('/whatsapp/config'),
-  updateConfig: (data: { enabled?: boolean; roundRobinThreshold?: number; autoReconnect?: boolean }) =>
-    api.put<ApiResponse>('/whatsapp/config', data),
-  test: () => api.post<ApiResponse<{ connected: boolean; detail: string }>>('/whatsapp/test'),
-
-  // Sessions
-  getSessions: () => api.get<ApiResponse<WaSessionInfo[]>>('/whatsapp/sessions'),
-  addSession: (data: { phone: string; name?: string }) => api.post<ApiResponse<WaSessionInfo>>('/whatsapp/sessions', data),
-  updateSession: (phone: string, data: { name?: string; active?: boolean }) =>
-    api.put<ApiResponse<WaSessionInfo>>(`/whatsapp/sessions/${phone}`, data),
-  removeSession: (phone: string) => api.delete<ApiResponse>(`/whatsapp/sessions/${phone}`),
-  getQr: (phone: string) => api.get<ApiResponse<{ qr: string | null }>>(`/whatsapp/sessions/${phone}/qr`),
-  connect: (phone: string) => api.post<ApiResponse<WaSessionInfo>>(`/whatsapp/sessions/${phone}/connect`),
-  logout: (phone: string) => api.post<ApiResponse>(`/whatsapp/sessions/${phone}/logout`),
-
-  // Send / contact
-  send: (data: { phone: string; message: string }) => api.post<ApiResponse<{ sent: boolean }>>('/whatsapp/send', data),
-  sendVoucher: (data: { phone: string; voucherCode: string; profile: { name: string; duration: number; quota?: number; validityDays?: number } }) =>
-    api.post<ApiResponse<{ sent: boolean }>>('/whatsapp/send-voucher', data),
-  checkNumber: (phone: string) => api.post<ApiResponse<{ phone: string; exists: boolean }>>('/whatsapp/check-number', { phone }),
-  contactInfo: (phone: string) => api.post<ApiResponse<{ phone: string; name: string | null; pushName: string | null; isWhatsApp: boolean }>>('/whatsapp/contact-info', { phone }),
-
-  // Logs
-  getLogs: (params: { limit?: number; offset?: number; status?: string; sessionPhone?: string; recipientPhone?: string }) =>
-    api.get<ApiResponse<{ rows: WaMessageLogRow[]; total: number }>>('/whatsapp/logs', { params }),
-};
 
 // ==========================================
 // ADMIN MANAGEMENT

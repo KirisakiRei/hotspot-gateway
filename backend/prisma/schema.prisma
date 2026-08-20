@@ -44,7 +44,7 @@ enum AdminRole {
 model User {
   id         String     @id @default(uuid(7))
   phone      String     @unique
-  name       String?    // WhatsApp contact name
+  name       String?    // contact name
   email      String?
   macAddress String?    @unique // Nullable to allow clearing on conflict
   ipAddress  String?
@@ -285,49 +285,6 @@ enum VideoType {
   LOCAL
   GDRIVE
   URL
-}
-
-// ==========================================
-// WHATSAPP GATEWAY (BAILEYS)
-// ==========================================
-
-model WaSession {
-  id        String   @id @default(uuid(7))
-  phone     String   @unique // Nomor pengirim (format internasional, tanpa '+')
-  name      String?  // Label internal (mis. "Router 1 - Tim A")
-  active    Boolean  @default(true) // Ikut round-robin / boleh dipakai kirim
-  state     String   @default("DISCONNECTED") // Cache runtime: DISCONNECTED|CONNECTING|CONNECTED
-  sentCount Int      @default(0) // Counter round-robin (direset oleh manager)
-  pairedAt  DateTime? // Terakhir berhasil pairing (QR ter-scan)
-  lastSeenAt DateTime? // Terakhir socket aktif
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  logs WaMessageLog[]
-
-  @@index([active])
-  @@map("wa_sessions")
-}
-
-model WaMessageLog {
-  id             String   @id @default(uuid(7))
-  sessionId      String?
-  session        WaSession? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
-  sessionPhone   String   // Nomor pengirim (denormalisasi agar tetap tercatat walau sesi dihapus)
-  recipientPhone String   // Nomor penerima
-  messageType    String   @default("TEXT") // TEXT | VOUCHER
-  message        String   @db.Text // Isi pesan yang dikirim (berisi template terpilih)
-  status         String   @default("PENDING") // PENDING | SENT | FAILED | REJECTED
-  errorMessage   String?  @db.Text
-  voucherCode    String?  // Traceability ke voucher, bila dikirim via sendVoucher
-  sentAt         DateTime?
-  createdAt      DateTime @default(now())
-
-  @@index([sessionPhone, createdAt])
-  @@index([recipientPhone, createdAt])
-  @@index([status])
-  @@index([createdAt])
-  @@map("wa_message_logs")
 }
 
 // ==========================================

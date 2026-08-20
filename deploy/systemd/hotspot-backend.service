@@ -1,5 +1,5 @@
 [Unit]
-Description=Hotspot Gateway API (NestJS + Baileys)
+Description=Hotspot Gateway API (NestJS)
 After=network.target mysql.service
 Wants=mysql.service
 
@@ -16,7 +16,7 @@ RestartSec=5
 TimeoutStopSec=20
 LimitNOFILE=65535
 
-# Satu proses saja — Baileys tidak cluster-safe
+# Satu proses saja
 Nice=0
 
 [Install]

@@ -416,7 +416,7 @@ export default function AdminVouchers() {
             <div className="flex items-center justify-between mb-4">
               <div>
                 <h2 className="font-semibold text-foreground">Pengaturan Pembuatan Voucher</h2>
-                <p className="text-sm text-muted-foreground mt-1">Pengaturan pembuatan voucher otomatis melalui WhatsApp</p>
+                <p className="text-sm text-muted-foreground mt-1">Pengaturan pembuatan voucher otomatis untuk akses gratis portal</p>
               </div>
               <button 
                 onClick={() => setShowGenerator(!showGenerator)}
@@ -433,9 +433,9 @@ export default function AdminVouchers() {
                   <div className="flex items-start gap-3">
                     <Send className="w-5 h-5 text-primary mt-0.5" />
                     <div>
-                      <h4 className="font-medium text-foreground">Pembuatan otomatis melalui WhatsApp</h4>
+                      <h4 className="font-medium text-foreground">Pembuatan otomatis akses gratis</h4>
                       <p className="text-sm text-muted-foreground mt-1">
-                        Voucher akan dibuat otomatis dan dikirim ke WhatsApp pengguna setelah mereka mengisi formulir di portal.
+                        Voucher akan dibuat otomatis setelah pengguna menonton video iklan di portal.
                         Pengaturan di bawah ini menentukan format kode voucher.
                       </p>
                     </div>

@@ -51,8 +51,8 @@ sudo -u hotspot bunx prisma migrate deploy
 sudo -u hotspot bunx prisma generate
 sudo -u hotspot bun run prisma:seed
 sudo -u hotspot bunx nest build
-sudo mkdir -p /opt/hotspot-gateway/backend/public/videos /opt/hotspot-gateway/backend/wa-auth
-sudo chown -R hotspot:hotspot /opt/hotspot-gateway/backend/public /opt/hotspot-gateway/backend/wa-auth
+sudo mkdir -p /opt/hotspot-gateway/backend/public/videos
+sudo chown -R hotspot:hotspot /opt/hotspot-gateway/backend/public
 ```
 
 Frontend (URL API di-bake saat build):
@@ -110,28 +110,28 @@ Tes: `/ping 10.8.0.1` dari router, `ping 10.8.0.2` dari VPS.
 1. Import `hotspot-setup.rsc` (sesuaikan interface WAN/bridge).
 2. Upload `login.html` ke `Files/hotspot/login.html`.
 3. Upload `mikrotik-pages/alogin.html` dan `status.html` ke folder yang sama.
-4. Pastikan walled garden **hanya** `wifi.rekavia.com` + WhatsApp (tanpa YouTube).
+4. Pastikan walled garden **hanya** `wifi.rekavia.com` (tanpa YouTube/Google/WhatsApp).
 5. Admin → Settings → MikroTik: host `10.8.0.2`, port `8728`, test connection.
 6. Settings → `portal_url` = `https://wifi.rekavia.com`
 
-## 7. WhatsApp + video
+## 7. Iklan video + akses gratis
 
 1. Buka `https://wifi.rekavia.com/admin` — ganti password seed.
-2. Settings → WhatsApp: tambah sesi, scan QR sekali.
-3. Admin → Iklan: upload MP4 (maks 100 MB), aktifkan. File masuk `backend/public/videos`.
+2. Admin → Iklan: upload MP4 (maks 100 MB), aktifkan. File masuk `backend/public/videos`.
+3. Admin → Voucher: pastikan ada profil aktif (mis. "Bronze - 1 Jam" dengan `session-timeout=1h`) — durasi akses gratis mengikuti profil ini.
 
 ## 8. Uji lapangan
 
 1. HP sambung SSID → popup Sign in (iOS/Android).
-2. Portal memutar video lokal (bukan YouTube).
-3. Isi nomor WA → kode masuk WhatsApp.
-4. iPhone: buka WA, kembali ke halaman portal — tetap di langkah input kode.
-5. Masukkan kode → internet terbuka.
+2. Portal memutar video lokal (bukan YouTube), tidak bisa di-skip.
+3. Setelah video selesai → tombol "Hubungkan ke Internet" menyala → klik.
+4. Browser diarahkan login native MikroTik → halaman terhubung menampilkan sisa waktu.
+5. Setelah `session-timeout` habis → MikroTik memutus sesi → user kembali ke portal untuk menonton iklan lagi.
 
 ## Catatan
 
-- Satu proses Nest saja. Jangan scale horizontal (Baileys).
-- Jangan `git push` folder `wa-auth/` atau `.env`.
+- Satu proses Nest saja.
+- Jangan `git push` file `.env`.
 - Rebuild frontend setiap kali `VITE_API_URL` berubah.
 - Update berikutnya cukup satu perintah: `sudo bash /var/www/hotspot-gateway/deploy/update.sh`.
   Skrip itu menarik git, build backend/frontend, merapikan izin `dist/`, lalu restart PM2 + Nginx. Tidak perlu `chmod` manual.

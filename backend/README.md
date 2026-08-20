@@ -1,6 +1,6 @@
 # Backend — Hotspot Gateway
 
-API NestJS untuk portal hotspot, voucher, MikroTik, dan gateway WhatsApp (Baileys).
+API NestJS untuk portal hotspot, voucher, dan MikroTik.
 
 Dokumentasi setup lengkap ada di [README root](../README.md).
 

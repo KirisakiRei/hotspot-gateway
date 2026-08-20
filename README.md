@@ -1,14 +1,13 @@
 # Hotspot Gateway
 
-Sistem manajemen hotspot MikroTik: portal captive, voucher, iklan, dan pengiriman kode akses lewat WhatsApp.
+Sistem manajemen hotspot MikroTik: portal captive, voucher, dan iklan video dengan akses internet gratis otomatis.
 
-Backend NestJS + Prisma + MySQL. Frontend React (Vite) + Tailwind. Gateway WhatsApp memakai [Baileys](https://github.com/WhiskeySockets/Baileys) secara in-process — tanpa layanan WAHA terpisah.
+Backend NestJS + Prisma + MySQL. Frontend React (Vite) + Tailwind.
 
 ## Fitur
 
-- **Portal captive** — alur video iklan → formulir → permintaan voucher
+- **Portal captive** — alur video iklan (tidak bisa di-skip) → klaim akses gratis otomatis → terhubung
 - **Voucher** — profil, batch, masa berlaku, kuota, dan sinkronisasi user hotspot MikroTik
-- **WhatsApp** — multi-sesi, QR pairing, round-robin pengirim, variasi template, log pesan
 - **Admin** — dashboard, user online, router, iklan, log sistem, pengaturan
 - **Monitoring** — sesi hotspot real-time lewat WebSocket (opsional Redis untuk multi-instance)
 - **Keamanan** — JWT + refresh token, role-based access, enkripsi kredensial router, rate limit
@@ -23,7 +22,6 @@ flowchart LR
   Admin[Dashboard admin] --> API
   API --> DB[(MySQL)]
   API -->|RouterOS API| MikroTik
-  API -->|Baileys| WA[WhatsApp]
   API -.->|opsional| Redis[(Redis)]
 ```
 
@@ -32,7 +30,7 @@ flowchart LR
 | Frontend | React 18, Vite, Tailwind, shadcn/ui, Socket.IO client |
 | Backend | NestJS 11, Prisma 6, Passport JWT, Socket.IO |
 | Data | MySQL / MariaDB, Redis opsional |
-| Integrasi | MikroTik RouterOS API, WhatsApp via Baileys |
+| Integrasi | MikroTik RouterOS API |
 
 ## Prasyarat
 
@@ -94,15 +92,6 @@ Admin: `http://localhost:5173/admin`
 
 Ganti semua password ini sebelum dipakai di lingkungan nyata.
 
-## WhatsApp
-
-1. Buka **Admin → Settings → WhatsApp**
-2. Tambah sesi (nomor pengirim, format internasional tanpa `+`)
-3. Scan QR dari perangkat WhatsApp
-4. Atur threshold round-robin (default 5 pesan per nomor)
-
-Kredensial sesi Baileys tersimpan di `backend/wa-auth/` (sudah di-ignore Git). Jangan membagikan folder itu.
-
 ## MikroTik
 
 Kredensial router disimpan terenkripsi di database (`ENCRYPTION_KEY`). Contoh skrip walled-garden dan halaman login ada di:
@@ -111,7 +100,9 @@ Kredensial router disimpan terenkripsi di database (`ENCRYPTION_KEY`). Contoh sk
 - `mikrotik-pages/`
 - `login.html`
 
-Pastikan hostname portal (`wifi.rekavia.com`) dan WhatsApp masuk walled-garden. Video iklan diputar dari VPS — jangan buka YouTube di walled garden.
+Pastikan hostname portal (`wifi.rekavia.com`) masuk walled-garden. Video iklan diputar dari VPS — jangan buka YouTube/Google di walled garden.
+
+Siklus akses: user menonton iklan → klaim akses gratis (durasi sesuai profil voucher, mis. 1 jam) → MikroTik `session-timeout` memutus sesi → user kembali ke portal untuk menonton iklan lagi.
 
 ## Produksi (VPS)
 
@@ -132,7 +123,7 @@ Ringkas:
 ```
 backend/                 NestJS API
   prisma/               Schema, migrasi, seed
-  src/modules/          auth, voucher, mikrotik, whatsapp, …
+  src/modules/          auth, voucher, mikrotik, session, …
 frontend/               Portal + dashboard admin
 mikrotik-pages/         Halaman login/status hotspot
 ```
@@ -141,7 +132,6 @@ mikrotik-pages/         Halaman login/status hotspot
 
 - File `.env` tidak boleh di-commit. Gunakan `.env.example` sebagai acuan.
 - Secret JWT dan kunci enkripsi wajib diisi; aplikasi gagal start jika kosong atau terlalu pendek.
-- Folder `wa-auth/` berisi sesi WhatsApp — perlakukan seperti password.
 - Password seed hanya untuk pengembangan lokal.
 
 ## Lisensi

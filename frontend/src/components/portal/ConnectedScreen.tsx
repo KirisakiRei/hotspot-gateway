@@ -168,10 +168,6 @@ export function ConnectedScreen() {
                 <span className="font-mono text-xs font-medium text-foreground">{state.session.mac}</span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Username</span>
-                <span className="font-medium text-foreground">{state.session.username}</span>
-              </div>
-              <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Waktu Online</span>
                 <span className="font-medium text-foreground">{formatUptime(state.session.uptime)}</span>
               </div>

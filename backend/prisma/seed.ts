@@ -257,35 +257,13 @@ async function main() {
       description: 'Mikrotik admin password',
       isEncrypted: true,
     },
-    // WhatsApp Gateway (Baileys) Settings
-    {
-      key: 'wa_enabled',
-      value: 'true',
-      type: SettingType.BOOLEAN,
-      group: 'whatsapp',
-      description: 'Master switch gateway WhatsApp',
-    },
-    {
-      key: 'wa_round_robin_threshold',
-      value: '5',
-      type: SettingType.NUMBER,
-      group: 'whatsapp',
-      description: 'Jumlah pesan per nomor sebelum round-robin berganti',
-    },
-    {
-      key: 'wa_auto_reconnect',
-      value: 'true',
-      type: SettingType.BOOLEAN,
-      group: 'whatsapp',
-      description: 'Auto-reconnect saat koneksi WhatsApp putus',
-    },
     // Portal Settings
     {
       key: 'portal_url',
       value: 'https://wifi.rekavia.com',
       type: SettingType.STRING,
       group: 'portal',
-      description: 'Base URL portal (tanpa /portal) untuk template pesan WhatsApp',
+      description: 'Base URL portal (tanpa /portal)',
     },
     {
       key: 'portal_title',

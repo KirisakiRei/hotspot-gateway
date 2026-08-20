@@ -1,11 +1,10 @@
-import { useState, useEffect, useRef } from 'react';
-import { Users, Shield, Plus, Edit, Trash2, X, AlertTriangle, Check, Wifi, MessageCircle, Loader2, RefreshCw } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Users, Shield, Plus, Edit, Trash2, X, AlertTriangle, Check, Wifi, Loader2, RefreshCw } from 'lucide-react';
 import { AdminSidebar } from '@/components/admin/AdminSidebar';
 import { AdminHeader } from '@/components/admin/AdminHeader';
 import { ActionButton, Badge } from '@/components/admin/AdminComponents';
 import { toast } from 'sonner';
-import { settingApi, mikrotikApi, whatsappApi, adminApi } from '@/services/api';
-import type { WaSessionInfo, WaMessageLogRow, WaStatus } from '@/services/api';
+import { settingApi, mikrotikApi, adminApi } from '@/services/api';
 import { getErrorMessage } from '@/lib/error';
 import { getCrudFlag, getPairFlag, togglePermission as toggleRolePermission, type RolePermissions } from '@/lib/permissions';
 
@@ -71,7 +70,7 @@ const defaultPermissions: RolePermission[] = [
 type ModalType = 'add-user' | 'edit-user' | 'delete-user' | 'add-role' | 'edit-role' | 'delete-role' | null;
 
 export default function AdminSettings() {
-  const [activeTab, setActiveTab] = useState<'users' | 'roles' | 'mikrotik' | 'whatsapp'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'roles' | 'mikrotik'>('users');
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [roles, setRoles] = useState<RolePermission[]>(defaultPermissions);
   const [modalType, setModalType] = useState<ModalType>(null);
@@ -91,22 +90,6 @@ export default function AdminSettings() {
   const [mikrotikStatus, setMikrotikStatus] = useState<{ connected: boolean; message?: string } | null>(null);
   const [isMikrotikLoading, setIsMikrotikLoading] = useState(false);
   const [isMikrotikTesting, setIsMikrotikTesting] = useState(false);
-
-  // WhatsApp Gateway state
-  const [waConfig, setWaConfig] = useState({ enabled: true, roundRobinThreshold: 5, autoReconnect: true });
-  const [waStatus, setWaStatus] = useState<WaStatus | null>(null);
-  const [waSessions, setWaSessions] = useState<WaSessionInfo[]>([]);
-  const [waLogs, setWaLogs] = useState<WaMessageLogRow[]>([]);
-  const [waLogsTotal, setWaLogsTotal] = useState(0);
-  const [waLogFilter, setWaLogFilter] = useState('');
-  const [isWaL, setIsWaL] = useState(false);
-  const [isWaTesting, setIsWaTesting] = useState(false);
-  const [newSessionPhone, setNewSessionPhone] = useState('');
-  const [newSessionName, setNewSessionName] = useState('');
-  const [waQr, setWaQr] = useState<Record<string, string>>({});
-  const [waBusyPhone, setWaBusyPhone] = useState<string | null>(null);
-  const waSessionsRef = useRef<WaSessionInfo[]>([]);
-  useEffect(() => { waSessionsRef.current = waSessions; }, [waSessions]);
 
   const [userFormData, setUserFormData] = useState<Partial<AdminUser & { password?: string }>>({
     name: '',
@@ -155,10 +138,8 @@ export default function AdminSettings() {
       loadRolePermissions();
     } else if (activeTab === 'mikrotik') {
       loadMikrotikSettings();
-    } else if (activeTab === 'whatsapp') {
-      loadWhatsappData();
     }
-  }, [activeTab, waLogFilter]);
+  }, [activeTab]);
 
   const loadMikrotikSettings = async () => {
     try {
@@ -190,60 +171,6 @@ export default function AdminSettings() {
       setIsMikrotikLoading(false);
     }
   };
-
-  const loadWhatsappData = async () => {
-    try {
-      setIsWaL(true);
-      const [statusRes, sessionsRes, logsRes, configRes] = await Promise.all([
-        whatsappApi.getStatus(),
-        whatsappApi.getSessions(),
-        whatsappApi.getLogs({ limit: 50, status: waLogFilter || undefined }),
-        whatsappApi.getConfig(),
-      ]);
-      setWaStatus(statusRes.data.data);
-      setWaSessions(sessionsRes.data.data || []);
-      setWaLogs(logsRes.data.data?.rows || []);
-      setWaLogsTotal(logsRes.data.data?.total || 0);
-      if (configRes.data.data) setWaConfig(configRes.data.data);
-    } catch (error) {
-      toast.error('Gagal memuat data WhatsApp');
-    } finally {
-      setIsWaL(false);
-    }
-  };
-
-  // Auto-refresh status & sessions (polling ringan)
-  useEffect(() => {
-    if (activeTab !== 'whatsapp') return;
-    const t = setInterval(() => {
-      whatsappApi.getStatus().then((r) => setWaStatus(r.data.data)).catch(() => undefined);
-      whatsappApi.getSessions().then((r) => setWaSessions(r.data.data || [])).catch(() => undefined);
-    }, 4000);
-    return () => clearInterval(t);
-  }, [activeTab]);
-
-  // Polling QR untuk sesi yang sedang pairing (CONNECTING)
-  useEffect(() => {
-    if (activeTab !== 'whatsapp') return;
-    const t = setInterval(async () => {
-      const current = waSessionsRef.current;
-      for (const s of current) {
-        if (s.state !== 'CONNECTING') {
-          setWaQr((prev) => (prev[s.phone] ? { ...prev, [s.phone]: '' } : prev));
-          continue;
-        }
-        try {
-          const r = await whatsappApi.getQr(s.phone);
-          const nextQr = r.data.data?.qr || '';
-          if (!nextQr) continue;
-          setWaQr((prev) => (prev[s.phone] === nextQr ? prev : { ...prev, [s.phone]: nextQr }));
-        } catch {
-          /* QR belum siap; biarkan polling berikutnya */
-        }
-      }
-    }, 2000);
-    return () => clearInterval(t);
-  }, [activeTab]);
 
   const testMikrotikConnection = async () => {
     try {
@@ -299,111 +226,6 @@ export default function AdminSettings() {
       toast.error('Gagal menyimpan pengaturan Mikrotik');
     } finally {
       setIsMikrotikLoading(false);
-    }
-  };
-
-  const testWhatsapp = async () => {
-    try {
-      setIsWaTesting(true);
-      const response = await whatsappApi.test();
-      if (response.data.success) {
-        toast.success('Gateway WhatsApp berfungsi');
-      } else {
-        toast.error(response.data.message || 'Gateway belum siap');
-      }
-    } catch (error: unknown) {
-      toast.error(getErrorMessage(error, 'Gagal terhubung ke server'));
-    } finally {
-      setIsWaTesting(false);
-    }
-  };
-
-  const saveWhatsappConfig = async () => {
-    try {
-      await whatsappApi.updateConfig(waConfig);
-      toast.success('Konfigurasi WhatsApp disimpan');
-      loadWhatsappData();
-    } catch (error: unknown) {
-      toast.error(getErrorMessage(error, 'Gagal menyimpan konfigurasi'));
-    }
-  };
-
-  const addWhatsappSession = async () => {
-    if (!newSessionPhone.trim()) {
-      toast.error('Nomor harus diisi');
-      return;
-    }
-    try {
-      await whatsappApi.addSession({ phone: newSessionPhone.trim(), name: newSessionName.trim() || undefined });
-      toast.success('Nomor ditambahkan');
-      setNewSessionPhone('');
-      setNewSessionName('');
-      loadWhatsappData();
-    } catch (error: unknown) {
-      toast.error(getErrorMessage(error, 'Gagal menambah nomor'));
-    }
-  };
-
-  const connectWhatsappSession = async (phone: string) => {
-    try {
-      setWaBusyPhone(phone);
-      setWaQr((prev) => ({ ...prev, [phone]: '' }));
-      await whatsappApi.connect(phone);
-      toast.info(`Menghubungkan ${phone}... scan QR untuk pairing`);
-      loadWhatsappData();
-    } catch (error: unknown) {
-      toast.error(getErrorMessage(error, 'Gagal menghubungkan'));
-    } finally {
-      setWaBusyPhone(null);
-    }
-  };
-
-  const logoutWhatsappSession = async (phone: string) => {
-    if (!window.confirm(`Logout nomor ${phone}? Perlu scan QR ulang untuk terhubung kembali.`)) return;
-    try {
-      setWaBusyPhone(phone);
-      setWaQr((prev) => ({ ...prev, [phone]: '' }));
-      await whatsappApi.logout(phone);
-      toast.success('Sesi dilogout. Klik tombol Hubungkan untuk menampilkan QR baru.');
-      loadWhatsappData();
-    } catch (error: unknown) {
-      toast.error(getErrorMessage(error, 'Gagal logout'));
-    } finally {
-      setWaBusyPhone(null);
-    }
-  };
-
-  const removeWhatsappSession = async (phone: string) => {
-    if (!window.confirm(`Hapus nomor ${phone} dari daftar?`)) return;
-    try {
-      setWaBusyPhone(phone);
-      await whatsappApi.removeSession(phone);
-      toast.success('Sesi dihapus');
-      loadWhatsappData();
-    } catch (error: unknown) {
-      toast.error(getErrorMessage(error, 'Gagal menghapus sesi'));
-    } finally {
-      setWaBusyPhone(null);
-    }
-  };
-
-  const toggleWhatsappSession = async (s: WaSessionInfo) => {
-    try {
-      await whatsappApi.updateSession(s.phone, { active: !s.active });
-      loadWhatsappData();
-    } catch (error: unknown) {
-      toast.error(getErrorMessage(error, 'Gagal mengubah status'));
-    }
-  };
-
-  const renameWhatsappSession = async (s: WaSessionInfo) => {
-    const name = window.prompt('Nama label nomor:', s.name || '');
-    if (name === null) return;
-    try {
-      await whatsappApi.updateSession(s.phone, { name });
-      loadWhatsappData();
-    } catch (error: unknown) {
-      toast.error(getErrorMessage(error, 'Gagal mengganti nama'));
     }
   };
 
@@ -629,17 +451,6 @@ export default function AdminSettings() {
             >
               <Wifi className="w-4 h-4" />
               Mikrotik
-            </button>
-            <button
-              onClick={() => setActiveTab('whatsapp')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl font-medium text-sm transition-colors ${
-                activeTab === 'whatsapp' 
-                  ? 'bg-primary text-primary-foreground' 
-                  : 'bg-secondary text-foreground hover:bg-secondary/80'
-              }`}
-            >
-              <MessageCircle className="w-4 h-4" />
-              WhatsApp Gateway
             </button>
           </div>
 
@@ -939,264 +750,6 @@ export default function AdminSettings() {
             </div>
           )}
 
-          {/* WhatsApp Gateway Tab */}
-          {activeTab === 'whatsapp' && (
-            <div className="space-y-6">
-              {/* Status & Config */}
-              <div className="stat-card">
-                <div className="flex items-center justify-between mb-6">
-                  <div className="flex items-center gap-3">
-                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${waStatus?.connected ? 'bg-success/10' : 'bg-destructive/10'}`}>
-                      <MessageCircle className={`w-5 h-5 ${waStatus?.connected ? 'text-success' : 'text-destructive'}`} />
-                    </div>
-                    <div>
-                      <h2 className="font-semibold text-foreground">WhatsApp Gateway</h2>
-                      <p className="text-sm text-muted-foreground">
-                        {waStatus?.connected
-                          ? `${waStatus.sessions.filter((s) => s.state === 'CONNECTED').length} nomor terhubung · ${waStatus.totalSentToday} pesan terkirim hari ini`
-                          : 'Belum ada nomor terhubung'}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {waStatus && (
-                      <Badge variant={waStatus.connected ? 'success' : 'destructive'}>
-                        {waStatus.connected ? 'Online' : 'Offline'}
-                      </Badge>
-                    )}
-                    <button onClick={loadWhatsappData} className="w-9 h-9 rounded-xl bg-secondary hover:bg-secondary/80 flex items-center justify-center transition-colors" title="Refresh">
-                      <RefreshCw className="w-4 h-4 text-muted-foreground" />
-                    </button>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-foreground mb-2">Pesan per nomor (round-robin)</label>
-                    <input
-                      type="number"
-                      min={1}
-                      max={100}
-                      value={waConfig.roundRobinThreshold}
-                      onChange={(e) => setWaConfig((prev) => ({ ...prev, roundRobinThreshold: parseInt(e.target.value) || 5 }))}
-                      className="w-full h-10 px-3 rounded-xl bg-secondary border-0 text-sm focus:ring-2 focus:ring-primary"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-foreground mb-2">Sakelar Utama</label>
-                    <div className="h-10 flex items-center">
-                      <label className="relative inline-flex items-center cursor-pointer">
-                        <input type="checkbox" checked={waConfig.enabled} onChange={(e) => setWaConfig((prev) => ({ ...prev, enabled: e.target.checked }))} className="sr-only peer" />
-                        <div className="w-11 h-6 bg-muted rounded-full peer peer-checked:bg-success after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-full"></div>
-                      </label>
-                      <span className="ml-3 text-sm text-muted-foreground">{waConfig.enabled ? 'Aktif' : 'Nonaktif'}</span>
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-foreground mb-2">Sambung Ulang Otomatis</label>
-                    <div className="h-10 flex items-center">
-                      <label className="relative inline-flex items-center cursor-pointer">
-                        <input type="checkbox" checked={waConfig.autoReconnect} onChange={(e) => setWaConfig((prev) => ({ ...prev, autoReconnect: e.target.checked }))} className="sr-only peer" />
-                        <div className="w-11 h-6 bg-muted rounded-full peer peer-checked:bg-success after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-full"></div>
-                      </label>
-                      <span className="ml-3 text-sm text-muted-foreground">{waConfig.autoReconnect ? 'Aktif' : 'Nonaktif'}</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex gap-3 pt-4">
-                  <button onClick={saveWhatsappConfig} className="h-10 px-4 rounded-xl bg-primary text-primary-foreground font-medium text-sm hover:bg-primary/90 transition-colors">
-                    Simpan Konfigurasi
-                  </button>
-                  <button onClick={testWhatsapp} disabled={isWaTesting} className="h-10 px-4 rounded-xl bg-secondary text-foreground font-medium text-sm hover:bg-secondary/80 transition-colors flex items-center gap-2 disabled:opacity-50">
-                    {isWaTesting ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-                    Uji Gateway
-                  </button>
-                </div>
-              </div>
-
-              {/* Sessions */}
-              <div className="stat-card">
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="font-semibold text-foreground">Nomor Pengirim (Sesi)</h2>
-                  <Badge>{waSessions.length} nomor</Badge>
-                </div>
-
-                {isWaL ? (
-                  <div className="flex items-center justify-center py-12">
-                    <Loader2 className="w-8 h-8 animate-spin text-primary" />
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {waSessions.length === 0 && (
-                      <div className="text-center py-8 text-sm text-muted-foreground">
-                        Belum ada nomor. Tambahkan nomor pengirim di bawah, lalu scan QR untuk pairing.
-                      </div>
-                    )}
-                    {waSessions.map((s) => (
-                      <div key={s.phone} className="bg-secondary/50 rounded-xl p-4">
-                        <div className="flex items-center justify-between flex-wrap gap-3">
-                          <div className="flex items-center gap-3">
-                            <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-medium ${s.state === 'CONNECTED' ? 'bg-success/10 text-success' : 'bg-muted text-muted-foreground'}`}>
-                              {s.name ? s.name.charAt(0).toUpperCase() : s.phone.slice(-4)}
-                            </div>
-                            <div>
-                              <p className="font-medium text-foreground">
-                                {s.name || 'Tanpa label'} <span className="text-xs text-muted-foreground">({s.phone})</span>
-                              </p>
-                              <p className="text-xs text-muted-foreground">
-                                {s.sentCount} pesan · {s.paired ? 'sudah terhubung' : 'belum terhubung'}
-                                {s.lastError ? ` · ${s.lastError}` : ''}
-                              </p>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Badge variant={s.state === 'CONNECTED' ? 'success' : s.state === 'CONNECTING' ? 'warning' : 'default'}>
-                              {s.state === 'CONNECTED' ? 'Terhubung' : s.state === 'CONNECTING' ? 'Menghubungkan' : 'Terputus'}
-                            </Badge>
-                            <Badge variant={s.active ? 'success' : 'default'}>{s.active ? 'Aktif' : 'Nonaktif'}</Badge>
-                            <button onClick={() => renameWhatsappSession(s)} className="w-8 h-8 rounded-lg hover:bg-secondary flex items-center justify-center transition-colors" title="Edit label">
-                              <Edit className="w-4 h-4 text-muted-foreground" />
-                            </button>
-                            <button onClick={() => toggleWhatsappSession(s)} className="w-8 h-8 rounded-lg hover:bg-secondary flex items-center justify-center transition-colors" title={s.active ? 'Nonaktifkan' : 'Aktifkan'}>
-                              {s.active ? <X className="w-4 h-4 text-muted-foreground" /> : <Check className="w-4 h-4 text-success" />}
-                            </button>
-                            <button onClick={() => connectWhatsappSession(s.phone)} disabled={waBusyPhone === s.phone || s.state === 'CONNECTED'} className="w-8 h-8 rounded-lg hover:bg-secondary flex items-center justify-center transition-colors disabled:opacity-40" title="Hubungkan">
-                              {waBusyPhone === s.phone ? <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" /> : <Wifi className="w-4 h-4 text-muted-foreground" />}
-                            </button>
-                            <button onClick={() => logoutWhatsappSession(s.phone)} disabled={waBusyPhone === s.phone} className="w-8 h-8 rounded-lg hover:bg-secondary flex items-center justify-center transition-colors disabled:opacity-40" title="Logout & hapus pairing">
-                              <X className="w-4 h-4 text-destructive" />
-                            </button>
-                            <button onClick={() => removeWhatsappSession(s.phone)} disabled={waBusyPhone === s.phone} className="w-8 h-8 rounded-lg hover:bg-destructive/10 flex items-center justify-center transition-colors disabled:opacity-40" title="Hapus nomor">
-                              <Trash2 className="w-4 h-4 text-destructive" />
-                            </button>
-                          </div>
-                        </div>
-
-                        {/* QR area saat pairing */}
-                        {s.state === 'CONNECTING' && (
-                          <div className="mt-4 flex items-center gap-4 bg-background rounded-xl p-4">
-                            {waQr[s.phone] ? (
-                              <>
-                                <img src={waQr[s.phone]} alt={`QR ${s.phone}`} className="w-40 h-40 rounded-lg bg-white p-2" />
-                                <div>
-                                  <p className="text-sm font-medium text-foreground mb-1">Scan QR di WhatsApp</p>
-                                  <p className="text-xs text-muted-foreground">
-                                    Buka WhatsApp → Setelan → Perangkat tertaut → Tautkan perangkat.
-                                    QR diperbarui otomatis setiap beberapa detik.
-                                  </p>
-                                </div>
-                              </>
-                            ) : (
-                              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                                Menunggu QR...
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    ))}
-
-                    {/* Add session */}
-                    <div className="bg-secondary/30 rounded-xl p-4 flex flex-col md:flex-row gap-3 items-end">
-                      <div className="flex-1">
-                        <label className="block text-sm font-medium text-foreground mb-2">Nomor baru (format internasional, tanpa +)</label>
-                        <input
-                          type="text"
-                          value={newSessionPhone}
-                          onChange={(e) => setNewSessionPhone(e.target.value)}
-                          placeholder="628123456789"
-                          className="w-full h-10 px-3 rounded-xl bg-background border-0 text-sm focus:ring-2 focus:ring-primary"
-                        />
-                      </div>
-                      <div className="flex-1">
-                        <label className="block text-sm font-medium text-foreground mb-2">Label (opsional)</label>
-                        <input
-                          type="text"
-                          value={newSessionName}
-                          onChange={(e) => setNewSessionName(e.target.value)}
-                          placeholder="Nomor utama"
-                          className="w-full h-10 px-3 rounded-xl bg-background border-0 text-sm focus:ring-2 focus:ring-primary"
-                        />
-                      </div>
-                      <ActionButton variant="primary" icon={Plus} onClick={addWhatsappSession}>
-                        Tambah
-                      </ActionButton>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Logs */}
-              <div className="stat-card">
-                <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
-                  <div className="flex items-center gap-3">
-                    <h2 className="font-semibold text-foreground">Riwayat Chat</h2>
-                    <Badge>{waLogsTotal} pesan</Badge>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <select value={waLogFilter} onChange={(e) => setWaLogFilter(e.target.value)} className="h-10 px-3 rounded-xl bg-secondary border-0 text-sm">
-                      <option value="">Semua status</option>
-                      <option value="SENT">Terkirim</option>
-                      <option value="PENDING">Menunggu</option>
-                      <option value="FAILED">Gagal</option>
-                      <option value="RECEIVED">Masuk</option>
-                    </select>
-                    <button onClick={loadWhatsappData} className="w-10 h-10 rounded-xl bg-secondary hover:bg-secondary/80 flex items-center justify-center transition-colors" title="Refresh">
-                      <RefreshCw className="w-4 h-4 text-muted-foreground" />
-                    </button>
-                  </div>
-                </div>
-
-                {isWaL ? (
-                  <div className="flex items-center justify-center py-12">
-                    <Loader2 className="w-8 h-8 animate-spin text-primary" />
-                  </div>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full">
-                      <thead>
-                        <tr className="border-b border-border">
-                          <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Waktu</th>
-                          <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Arah</th>
-                          <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Pengirim</th>
-                          <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Penerima</th>
-                          <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Tipe</th>
-                          <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Status</th>
-                          <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Pesan</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {waLogs.length === 0 && (
-                          <tr>
-                            <td colSpan={7} className="py-8 text-center text-sm text-muted-foreground">Belum ada riwayat pesan.</td>
-                          </tr>
-                        )}
-                        {waLogs.map((log) => (
-                          <tr key={log.id} className="border-b border-border/50 hover:bg-secondary/50">
-                            <td className="py-3 px-4 text-xs text-muted-foreground whitespace-nowrap">{new Date(log.createdAt).toLocaleString('id-ID')}</td>
-                            <td className="py-3 px-4">{log.messageType === 'INCOMING' ? <Badge variant="warning">Masuk</Badge> : <Badge variant="success">Keluar</Badge>}</td>
-                            <td className="py-3 px-4 text-sm">{log.sessionPhone}</td>
-                            <td className="py-3 px-4 text-sm">{log.recipientPhone}</td>
-                            <td className="py-3 px-4"><Badge>{log.messageType === 'VOUCHER' ? 'Voucher' : log.messageType === 'INCOMING' ? 'Masuk' : 'Pesan'}</Badge></td>
-                            <td className="py-3 px-4">
-                              <Badge variant={log.status === 'SENT' ? 'success' : log.status === 'FAILED' ? 'destructive' : 'default'}>
-                                {log.status === 'SENT' ? 'Terkirim' : log.status === 'FAILED' ? 'Gagal' : log.status === 'PENDING' ? 'Menunggu' : log.status === 'RECEIVED' ? 'Diterima' : log.status}
-                              </Badge>
-                            </td>
-                            <td className="py-3 px-4 text-sm text-muted-foreground max-w-[280px]">
-                              <div className="truncate" title={log.message}>{log.message}</div>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
         </div>
       </main>
 

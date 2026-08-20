@@ -1,8 +1,5 @@
 import { PortalProvider, usePortal } from '@/contexts/PortalContext';
 import { VideoScreen } from '@/components/portal/VideoScreen';
-import { FormScreen } from '@/components/portal/FormScreen';
-import { VoucherScreen } from '@/components/portal/VoucherScreen';
-import { SuccessScreen } from '@/components/portal/SuccessScreen';
 import { ConnectedScreen } from '@/components/portal/ConnectedScreen';
 import { Loader2 } from 'lucide-react';
 
@@ -20,16 +17,9 @@ function PortalFlow() {
   }
 
   switch (state.currentStep) {
-    case 'video':
-      return <VideoScreen />;
-    case 'form':
-      return <FormScreen />;
-    case 'voucher':
-      return <VoucherScreen />;
-    case 'success':
-      return <SuccessScreen />;
     case 'connected':
       return <ConnectedScreen />;
+    case 'video':
     default:
       return <VideoScreen />;
   }

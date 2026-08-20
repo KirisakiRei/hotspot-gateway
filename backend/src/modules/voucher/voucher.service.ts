@@ -4,8 +4,6 @@ import {
   BadRequestException,
   InternalServerErrorException,
   Logger,
-  Inject,
-  forwardRef,
 } from '@nestjs/common';
 import { PrismaService } from '@/common/prisma.service';
 import {
@@ -14,7 +12,6 @@ import {
 } from './dto/voucher-profile.dto';
 import { GenerateVoucherDto, RedeemVoucherDto } from './dto/voucher.dto';
 import { Prisma, Voucher, VoucherProfile, VoucherStatus } from '@prisma/client';
-import { WhatsappService } from '@/modules/whatsapp/whatsapp.service';
 import { MikrotikService } from '@/modules/mikrotik/mikrotik.service';
 import { SessionService } from '@/modules/session/session.service';
 import { normalizeMac } from '@/common/utils/mac';
@@ -27,8 +24,6 @@ export class VoucherService {
 
   constructor(
     private prisma: PrismaService,
-    @Inject(forwardRef(() => WhatsappService))
-    private whatsappService: WhatsappService,
     private mikrotikService: MikrotikService,
     private sessionService: SessionService,
   ) {}
@@ -569,15 +564,8 @@ export class VoucherService {
       },
     });
 
-    // Get WhatsApp contact name
-    let contactName: string | null = null;
-    try {
-      const contactInfo = await this.whatsappService.getContactInfo(normalizedPhone);
-      contactName = contactInfo.name || contactInfo.pushName;
-      this.logger.log(`Got contact name from WhatsApp: ${contactName || 'Not found'}`);
-    } catch (error) {
-      this.logger.warn(`Failed to get contact name: ${error.message}`);
-    }
+    // Get contact name
+    const contactName: string | null = null;
 
     // Check if user already exists by phone
     let user = await this.prisma.user.findUnique({
@@ -685,35 +673,20 @@ export class VoucherService {
       }
     }
 
-    // Send voucher via WhatsApp
-    try {
-      await this.whatsappService.sendVoucher(normalizedPhone, code, {
-        name: profile.name,
-        duration: profile.duration,
-        quota: profile.quota ? Number(profile.quota) : undefined,
-        validityDays: profile.validityDays,
-      });
-      this.logger.log(`Voucher ${code} sent to recipient ${normalizedPhone} via WhatsApp`);
-    } catch (error: unknown) {
-      const msg = error instanceof Error ? error.message : String(error);
-      this.logger.error(`Failed to send voucher via WhatsApp: ${msg}`);
-      // Don't throw - voucher is still generated, just not sent via WA
-    }
-
     // Log the request
     await this.prisma.systemLog.create({
       data: {
         userId: user.id,
         type: 'VOUCHER',
         action: 'REQUEST',
-        description: `User requested voucher: ${code}${contactName ? ` (${contactName})` : ''}`,
+        description: `User requested voucher: ${code}`,
         ipAddress: ipAddress,
         macAddress: macAddress,
         status: 'SUCCESS',
       },
     });
 
-    this.logger.log(`Voucher ${code} requested by ${normalizedPhone} (${contactName || 'Unknown'})`);
+    this.logger.log(`Voucher ${code} requested by ${normalizedPhone}`);
 
     return {
       voucher,
@@ -943,6 +916,191 @@ export class VoucherService {
       where: { id },
       data: { status: VoucherStatus.DISABLED },
     });
+  }
+
+  // ==========================================
+  // PORTAL FLOW - CLAIM FREE ACCESS (no WhatsApp)
+  // ==========================================
+
+  /**
+   * Buat akses gratis untuk satu perangkat (MAC) setelah video iklan selesai.
+   * Alur: video selesai -> klaim -> backend buat voucher + hotspot user di
+   * MikroTik -> frontend POST form native (A-PAP) ke $(link-login-only).
+   */
+  async claimFreeVoucher(mac: string, ip?: string) {
+    // 1. Normalisasi MAC
+    const normalizedMac = normalizeMac(mac);
+    if (!normalizedMac) {
+      throw new BadRequestException('MAC address tidak valid');
+    }
+
+    // 2. Cek apakah perangkat sudah punya sesi aktif di MikroTik
+    try {
+      const activeSession = await this.mikrotikService.getActiveSessionByMac(
+        normalizedMac,
+      );
+      if (activeSession) {
+        this.logger.log(`MAC ${normalizedMac} sudah punya sesi aktif`);
+        return {
+          success: true,
+          message: 'Sudah terhubung',
+          alreadyConnected: true,
+          credentials: null,
+        };
+      }
+    } catch (error: unknown) {
+      this.logger.warn(
+        `Gagal cek sesi aktif MikroTik (${getErrorMessage(error)}) — lanjut klaim`,
+      );
+    }
+
+    // 3. Ambil profile dari pengaturan voucher (atau profile aktif pertama)
+    const generateSettingsRecord = await this.prisma.setting.findUnique({
+      where: { key: 'voucher_generate_settings' },
+    });
+
+    let profileId = '';
+    if (generateSettingsRecord?.value) {
+      try {
+        const parsed = JSON.parse(generateSettingsRecord.value);
+        profileId = parsed.profileId || '';
+      } catch {
+        this.logger.warn('Gagal parse voucher_generate_settings');
+      }
+    }
+
+    let profile = null as VoucherProfile | null;
+    if (profileId) {
+      profile = await this.prisma.voucherProfile.findUnique({
+        where: { id: profileId, isActive: true },
+      });
+    }
+    if (!profile) {
+      profile = await this.prisma.voucherProfile.findFirst({
+        where: { isActive: true },
+        orderBy: { createdAt: 'desc' },
+      });
+    }
+    if (!profile) {
+      throw new NotFoundException(
+        'Tidak ada profil voucher aktif. Buat profil terlebih dahulu di admin.',
+      );
+    }
+
+    // 4. Generate kode voucher (6 digit, tanpa prefix)
+    const code = this.generateVoucherCode('', 6, 'mixed_upper');
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + profile.duration * 60 * 1000);
+
+    // 5. Buat record voucher (langsung USED — dipakai device ini)
+    const voucher = await this.prisma.voucher.create({
+      data: {
+        code,
+        profileId: profile.id,
+        expiresAt,
+        status: VoucherStatus.USED,
+        usedBy: normalizedMac,
+        activatedAt: now,
+        usedAt: now,
+      },
+    });
+
+    // 6. Siapkan hotspot user di MikroTik (username = password = kode)
+    try {
+      const userCreated = await this.mikrotikService.createOrUpdateHotspotUser(
+        code,
+        code,
+        profile.name,
+      );
+      if (!userCreated) {
+        throw new BadRequestException(
+          'Gagal membuat user di MikroTik. Profile mungkin tidak sesuai.',
+        );
+      }
+      this.logger.log(`Hotspot user siap di router: ${code}`);
+    } catch (error: unknown) {
+      this.logger.error(`Gagal menyiapkan user MikroTik: ${getErrorMessage(error)}`);
+      if (error instanceof BadRequestException) throw error;
+      throw new InternalServerErrorException(
+        'Gagal menyiapkan user di MikroTik. Silakan hubungi admin.',
+      );
+    }
+
+    // 7. Buat/update user + session di DB
+    try {
+      const existingUser = await this.prisma.user.findUnique({
+        where: { macAddress: normalizedMac },
+      });
+
+      if (existingUser) {
+        await this.prisma.user.update({
+          where: { macAddress: normalizedMac },
+          data: {
+            voucher: { connect: { id: voucher.id } },
+            ipAddress: ip ?? existingUser.ipAddress,
+            status: 'ONLINE',
+            loginAt: now,
+          },
+        });
+      } else {
+        await this.prisma.user.create({
+          data: {
+            phone: `guest-${Date.now()}-${crypto.randomBytes(2).toString('hex')}`,
+            macAddress: normalizedMac,
+            ipAddress: ip || '0.0.0.0',
+            name: 'Guest User',
+            status: 'ONLINE',
+            loginAt: now,
+            voucher: { connect: { id: voucher.id } },
+          },
+        });
+      }
+
+      await this.prisma.session.create({
+        data: {
+          user: { connect: { macAddress: normalizedMac } },
+          startedAt: now,
+          ipAddress: ip || '0.0.0.0',
+          macAddress: normalizedMac,
+        },
+      });
+    } catch (error: unknown) {
+      this.logger.error(
+        `Gagal buat/update user & session: ${getErrorMessage(error)}`,
+      );
+      // Tidak menggagalkan klaim — hotspot user di MikroTik sudah siap
+    }
+
+    // 8. Log
+    await this.prisma.systemLog.create({
+      data: {
+        type: 'VOUCHER',
+        action: 'FREE_ACCESS_CLAIM',
+        description: `Akses gratis diklaim untuk MAC ${normalizedMac} (profile: ${profile.name})`,
+        ipAddress: ip,
+        macAddress: normalizedMac,
+        metadata: {
+          voucherCode: code,
+          profile: profile.name,
+          duration: profile.duration,
+        },
+      },
+    });
+
+    return {
+      success: true,
+      message: 'Akses internet siap diaktifkan',
+      alreadyConnected: false,
+      credentials: {
+        username: code,
+        password: code,
+      },
+      profile: {
+        name: profile.name,
+        duration: profile.duration,
+      },
+      expiresAt,
+    };
   }
 
   // ==========================================
@@ -1258,8 +1416,8 @@ export class VoucherService {
   }
 
   /**
-   * Resume portal after iOS CNA closes (user opened WhatsApp).
-   * Looks up the latest unused voucher bound to this MAC.
+   * Resume portal setelah iOS CNA menutup sesi.
+   * Mencari voucher terakhir yang belum terpakai untuk MAC ini.
    */
   async getPendingVoucher(mac: string) {
     const normalizedMac = mac.trim();

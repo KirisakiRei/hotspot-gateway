@@ -22,12 +22,9 @@
 /ip hotspot profile add name=public-wifi login-by=http-chap,http-pap http-cookie-lifetime=1d use-radius=no html-directory=hotspot
 /ip hotspot add name=public-hotspot profile=public-wifi interface=bridge address-pool=hotspot-pool
 
-# 4. Walled garden — HANYA portal VPS + WhatsApp
-# Tidak ada YouTube/Google: video diputar dari VPS.
+# 4. Walled garden — HANYA portal VPS
+# Tidak ada YouTube/Google/WhatsApp: video diputar dari VPS.
 /ip hotspot walled-garden add dst-host=wifi.rekavia.com action=allow comment="portal+api"
-/ip hotspot walled-garden add dst-host=*.whatsapp.com action=allow comment="wa"
-/ip hotspot walled-garden add dst-host=*.whatsapp.net action=allow comment="wa"
-/ip hotspot walled-garden add dst-host=*.w.app action=allow comment="wa"
 
 # 5. DNS + NAT (ganti ether4 sesuai WAN)
 /ip dns set allow-remote-requests=yes servers=1.1.1.1,8.8.8.8

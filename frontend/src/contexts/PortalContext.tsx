@@ -1,8 +1,8 @@
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
-import { advertisementApi, voucherApi, type Advertisement, type Voucher, type SessionInfo, type TrackAdRequest, type AuthenticateVoucherResponse, handleApiError } from '@/services/api';
+import { advertisementApi, voucherApi, type Advertisement, type SessionInfo, type TrackAdRequest, type ClaimFreeVoucherResponse, handleApiError } from '@/services/api';
 import { useToast } from '@/hooks/use-toast';
 
-export type PortalStep = 'video' | 'form' | 'voucher' | 'success' | 'connected';
+export type PortalStep = 'video' | 'connected';
 
 interface DeviceInfo {
   mac: string;
@@ -15,12 +15,7 @@ interface DeviceInfo {
 
 interface PortalState {
   currentStep: PortalStep;
-  phoneNumber: string;
-  email: string;
-  voucherCode: string;
-  agreedToTerms: boolean;
   advertisement: Advertisement | null;
-  voucher: Voucher | null;
   session: SessionInfo | null;
   loading: boolean;
   error: string | null;
@@ -28,51 +23,68 @@ interface PortalState {
   checkingSession: boolean;
 }
 
-interface PortalProgress {
-  mac: string;
-  phoneNumber: string;
-  email: string;
-  agreedToTerms: boolean;
-  step: PortalStep;
-  updatedAt: number;
+interface PortalContextType {
+  state: PortalState;
+  setStep: (step: PortalStep) => void;
+  loadAdvertisement: () => Promise<void>;
+  trackAdView: () => Promise<void>;
+  trackAdComplete: (watchTime?: number) => Promise<void>;
+  claimFreeAccess: () => Promise<void>;
+  checkSession: () => Promise<void>;
+  disconnectSession: () => Promise<void>;
+  resetPortal: () => void;
 }
 
-const PORTAL_PROGRESS_KEY = 'portal_progress';
-const PROGRESS_TTL_MS = 2 * 60 * 60 * 1000;
+// Parse Mikrotik URL params
+// Mikrotik sends: ?mac=AA:BB:CC:DD:EE:FF&ip=192.168.10.100&link-login=...&link-login-only=...&link-orig=...&error=...
+// After successful login: ?status=connected&mac=...&ip=...&username=...
+const parseDeviceInfoFromUrl = (): DeviceInfo & { status?: string; username?: string } => {
+  const params = new URLSearchParams(window.location.search);
 
-const readProgress = (mac: string): PortalProgress | null => {
-  try {
-    const raw = localStorage.getItem(PORTAL_PROGRESS_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as PortalProgress;
-    if (!parsed.mac || parsed.mac !== mac) return null;
-    if (Date.now() - parsed.updatedAt > PROGRESS_TTL_MS) return null;
-    if (parsed.step !== 'form' && parsed.step !== 'voucher') return null;
-    return parsed;
-  } catch {
-    return null;
-  }
+  // Development mode: Use mock data ONLY if explicitly testing without Mikrotik
+  const useMockDevice = import.meta.env.VITE_USE_MOCK_DEVICE === 'true';
+
+  const macFromUrl = params.get('mac');
+  const macFromStorage = localStorage.getItem('device_mac');
+  const mac = macFromUrl || macFromStorage || (useMockDevice ? '00:11:22:33:44:55' : '');
+
+  const ipFromUrl = params.get('ip');
+  const ipFromStorage = localStorage.getItem('device_ip');
+  const ip = ipFromUrl || ipFromStorage || (useMockDevice ? '192.168.10.100' : '');
+
+  if (macFromUrl) localStorage.setItem('device_mac', macFromUrl);
+  if (ipFromUrl) localStorage.setItem('device_ip', ipFromUrl);
+
+  return {
+    mac,
+    ip,
+    linkLogin: params.get('link-login') || params.get('link_login') || '',
+    linkLoginOnly: params.get('link-login-only') || params.get('link_login_only') || '',
+    linkOrig: params.get('link-orig') || params.get('link_orig') || '',
+    error: params.get('error') || '',
+    status: params.get('status') || '',
+    username: params.get('username') || '',
+  };
 };
 
-const writeProgress = (progress: Omit<PortalProgress, 'updatedAt'>) => {
-  try {
-    localStorage.setItem(PORTAL_PROGRESS_KEY, JSON.stringify({
-      ...progress,
-      updatedAt: Date.now(),
-    }));
-  } catch {
-    // Safari private / CNA storage may reject writes
-  }
+const initialDeviceInfo = parseDeviceInfoFromUrl();
+
+const initialState: PortalState = {
+  currentStep: 'video',
+  advertisement: null,
+  session: null,
+  loading: false,
+  error: null,
+  deviceInfo: initialDeviceInfo,
+  checkingSession: true,
 };
 
-const clearProgress = () => {
-  localStorage.removeItem(PORTAL_PROGRESS_KEY);
-};
+const PortalContext = createContext<PortalContextType | undefined>(undefined);
 
 /**
  * Submit form native (PAP) ke endpoint login MikroTik.
- * MikroTik memvalidasi username/password terhadap /ip hotspot user,
- * membuat cookie sesi, lalu meredirect browser ke `dst` (link-orig).
+ * MikroTik memvalidasi username/password, membuat cookie sesi,
+ * lalu meredirect browser ke `dst` (link-orig).
  */
 const submitNativeLoginForm = (
   action: string,
@@ -101,287 +113,30 @@ const submitNativeLoginForm = (
   form.submit();
 };
 
-interface PortalContextType {
-  state: PortalState;
-  setStep: (step: PortalStep) => void;
-  setPhoneNumber: (phone: string) => void;
-  setEmail: (email: string) => void;
-  setVoucherCode: (code: string) => void;
-  setAgreedToTerms: (agreed: boolean) => void;
-  loadAdvertisement: () => Promise<void>;
-  trackAdView: () => Promise<void>;
-  trackAdComplete: (watchTime?: number) => Promise<void>;
-  trackAdSkip: () => Promise<void>;
-  requestVoucher: () => Promise<void>;
-  resendVoucher: () => Promise<void>;
-  redeemVoucher: () => Promise<void>;
-  authenticateVoucher: () => Promise<void>;
-  checkSession: () => Promise<void>;
-  disconnectSession: () => Promise<void>;
-  resetPortal: () => void;
-}
-
-// Parse Mikrotik URL params
-// Mikrotik sends: ?mac=AA:BB:CC:DD:EE:FF&ip=192.168.10.100&link-login=...&link-login-only=...&link-orig=...&error=...
-// After successful login: ?status=connected&mac=...&ip=...&username=...
-const parseDeviceInfoFromUrl = (): DeviceInfo & { status?: string; username?: string } => {
-  const params = new URLSearchParams(window.location.search);
-  
-  // Development mode: Use mock data ONLY if explicitly testing without Mikrotik
-  // Set VITE_USE_MOCK_DEVICE=true in .env to enable
-  const useMockDevice = import.meta.env.VITE_USE_MOCK_DEVICE === 'true';
-  
-  // Get MAC from URL first, then localStorage, then mock
-  const macFromUrl = params.get('mac');
-  const macFromStorage = localStorage.getItem('device_mac');
-  const mac = macFromUrl || macFromStorage || (useMockDevice ? '00:11:22:33:44:55' : '');
-  
-  // Get IP from URL first, then localStorage, then mock
-  const ipFromUrl = params.get('ip');
-  const ipFromStorage = localStorage.getItem('device_ip');
-  const ip = ipFromUrl || ipFromStorage || (useMockDevice ? '192.168.10.100' : '');
-  
-  // Store in localStorage for next refresh (if from URL)
-  if (macFromUrl) {
-    localStorage.setItem('device_mac', macFromUrl);
-    console.log('💾 Stored MAC to localStorage:', macFromUrl);
-  }
-  if (ipFromUrl) {
-    localStorage.setItem('device_ip', ipFromUrl);
-    console.log('💾 Stored IP to localStorage:', ipFromUrl);
-  }
-  
-  return {
-    mac,
-    ip,
-    linkLogin: params.get('link-login') || params.get('link_login') || '',
-    linkLoginOnly: params.get('link-login-only') || params.get('link_login_only') || '',
-    linkOrig: params.get('link-orig') || params.get('link_orig') || '',
-    error: params.get('error') || '',
-    // New: status from Mikrotik status.html redirect
-    status: params.get('status') || '',
-    username: params.get('username') || '',
-  };
-};
-
-const initialDeviceInfo = parseDeviceInfoFromUrl();
-
-// Log device info for debugging
-console.log('📱 Initial device info:', {
-  mac: initialDeviceInfo.mac,
-  ip: initialDeviceInfo.ip,
-  status: initialDeviceInfo.status,
-  hasMAC: !!initialDeviceInfo.mac,
-});
-
-const initialState: PortalState = {
-  currentStep: 'video',
-  phoneNumber: '',
-  email: '',
-  voucherCode: '',
-  agreedToTerms: false,
-  advertisement: null,
-  voucher: null,
-  session: null,
-  loading: false,
-  error: null,
-  deviceInfo: initialDeviceInfo,
-  checkingSession: true, // Start with checking session
-};
-
-const PortalContext = createContext<PortalContextType | undefined>(undefined);
-
 export function PortalProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<PortalState>(initialState);
   const { toast } = useToast();
-  
-  // Check for existing session on mount - THIS MUST RUN FIRST
-  useEffect(() => {
-    const initializePortal = async () => {
-      console.log('🚀 Portal initializing...');
-      
-      // Parse URL params including status
-      const urlInfo = parseDeviceInfoFromUrl();
-      const mac = urlInfo.mac || localStorage.getItem('device_mac') || '';
-      
-      console.log('🔍 Device info:', { 
-        mac, 
-        hasMAC: !!mac, 
-        status: urlInfo.status,
-        urlHasMAC: !!urlInfo.mac,
-        storageMAC: localStorage.getItem('device_mac'),
-      });
-      
-      // Case 1: Coming from Mikrotik status.html after successful login
-      if (urlInfo.status === 'connected') {
-        console.log('✅ User redirected from Mikrotik status page - already connected');
-        
-        // Clean URL (remove query params) but keep on connected page
-        window.history.replaceState({}, '', window.location.pathname);
-        
-        // Set session from URL params
-        if (mac) {
-          setState(prev => ({ 
-            ...prev, 
-            currentStep: 'connected',
-            checkingSession: false,
-            session: {
-              mac: mac,
-              ip: urlInfo.ip,
-              username: urlInfo.username || 'Connected',
-            } as SessionInfo,
-          }));
-          
-          // Verify session with backend in background
-          try {
-            const response = await voucherApi.checkSession({ mac });
-            const data = response.data.data as SessionInfo & { active?: boolean; session?: SessionInfo };
-            if (response.data.success && data?.active && data?.session) {
-              console.log('✅ Session verified with backend:', data.session);
-              setState(prev => ({ 
-                ...prev, 
-                session: data.session,
-              }));
-            }
-          } catch (e) {
-            console.log('Session verify skipped:', e);
-          }
-        }
-        return; // Don't load advertisement for connected users
-      }
-      
-      // Case 2: Normal portal access - ALWAYS check session first if we have MAC
-      if (mac) {
-        console.log('🔍 Checking active session for MAC:', mac);
-        try {
-          const response = await voucherApi.checkSession({ mac });
-          console.log('📡 Check session response:', response.data);
-          const data = response.data.data as SessionInfo & { active?: boolean; session?: SessionInfo };
-          
-          // Backend returns { active: true/false, session: {...} }
-          if (response.data.success && data?.active && data?.session) {
-            // User has active session - go directly to connected page
-            console.log('✅ User already has active session!', data.session);
-            
-            // Cache session info to localStorage for quick subsequent checks
-            localStorage.setItem('portal_session_cache', JSON.stringify({
-              active: true,
-              mac: mac,
-              timestamp: Date.now(),
-              session: data.session,
-            }));
-            
-            setState(prev => ({ 
-              ...prev, 
-              session: data.session,
-              currentStep: 'connected',
-              checkingSession: false 
-            }));
-            return; // Don't load advertisement for connected users
-          } else {
-            console.log('📋 No active session found:', data);
-          }
-        } catch (error) {
-          console.error('❌ Session check failed:', error);
-        }
-
-        const saved = readProgress(mac);
-        if (saved) {
-          setState((prev) => ({
-            ...prev,
-            currentStep: saved.step,
-            phoneNumber: saved.phoneNumber,
-            email: saved.email,
-            agreedToTerms: saved.agreedToTerms,
-            checkingSession: false,
-          }));
-          if (saved.step === 'video') {
-            loadAdvertisement();
-          }
-          return;
-        }
-
-        try {
-          const pendingRes = await voucherApi.getPending({ mac });
-          const pending = pendingRes.data.data;
-          if (pendingRes.data.success && pending?.pending) {
-            setState((prev) => ({
-              ...prev,
-              currentStep: 'voucher',
-              phoneNumber: pending.phone || prev.phoneNumber,
-              checkingSession: false,
-            }));
-            return;
-          }
-        } catch (error) {
-          console.log('Pending voucher check skipped:', error);
-        }
-      } else {
-        console.log('⚠️ No MAC address found, cannot check session');
-      }
-      
-      console.log('📺 Loading advertisement for new user...');
-      setState(prev => ({ ...prev, checkingSession: false }));
-      loadAdvertisement();
-    };
-
-    initializePortal();
-  }, []);
-
-  useEffect(() => {
-    const mac = state.deviceInfo.mac;
-    if (!mac || state.checkingSession) return;
-    if (state.currentStep === 'form' || state.currentStep === 'voucher') {
-      writeProgress({
-        mac,
-        phoneNumber: state.phoneNumber,
-        email: state.email,
-        agreedToTerms: state.agreedToTerms,
-        step: state.currentStep,
-      });
-    }
-  }, [
-    state.currentStep,
-    state.phoneNumber,
-    state.email,
-    state.agreedToTerms,
-    state.deviceInfo.mac,
-    state.checkingSession,
-  ]);
-
-  const setStep = (step: PortalStep) => {
-    setState(prev => ({ ...prev, currentStep: step }));
-  };
-
-  const setPhoneNumber = (phoneNumber: string) => {
-    setState(prev => ({ ...prev, phoneNumber }));
-  };
-
-  const setEmail = (email: string) => {
-    setState(prev => ({ ...prev, email }));
-  };
-
-  const setVoucherCode = (voucherCode: string) => {
-    setState(prev => ({ ...prev, voucherCode }));
-  };
-
-  const setAgreedToTerms = (agreedToTerms: boolean) => {
-    setState(prev => ({ ...prev, agreedToTerms }));
-  };
 
   const loadAdvertisement = async () => {
+    setState(prev => ({ ...prev, loading: true, error: null }));
+
     try {
-      setState(prev => ({ ...prev, loading: true, error: null }));
       const response = await advertisementApi.getActive();
-      
-      if (response.data.success && response.data.data) {
-        setState(prev => ({ 
-          ...prev, 
-          advertisement: response.data.data!,
-          loading: false 
+      const data = response.data.data;
+
+      if (data) {
+        setState(prev => ({
+          ...prev,
+          advertisement: data,
+          loading: false,
+          currentStep: 'video',
         }));
       } else {
-        throw new Error('Tidak ada iklan aktif saat ini');
+        setState(prev => ({
+          ...prev,
+          loading: false,
+          error: 'Tidak ada iklan aktif saat ini',
+        }));
       }
     } catch (error) {
       const errorMsg = handleApiError(error);
@@ -396,7 +151,6 @@ export function PortalProvider({ children }: { children: ReactNode }) {
 
   const trackAdView = async () => {
     if (!state.advertisement) return;
-    
     try {
       await advertisementApi.trackView(state.advertisement.id, { deviceId: state.deviceInfo.mac });
     } catch (error) {
@@ -406,7 +160,6 @@ export function PortalProvider({ children }: { children: ReactNode }) {
 
   const trackAdComplete = async (watchTime?: number) => {
     if (!state.advertisement) return;
-    
     try {
       const payload: TrackAdRequest = { deviceId: state.deviceInfo.mac };
       if (typeof watchTime === 'number' && Number.isFinite(watchTime)) {
@@ -420,221 +173,85 @@ export function PortalProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const trackAdSkip = async () => {
-    if (!state.advertisement) return;
-    
-    try {
-      await advertisementApi.trackSkip(state.advertisement.id, { deviceId: state.deviceInfo.mac });
-    } catch (error) {
-      console.error('Failed to track ad skip:', error);
-    }
-  };
+  // Klaim akses gratis (video selesai -> auto buat voucher + login native)
+  const claimFreeAccess = async () => {
+    const mac = state.deviceInfo.mac || localStorage.getItem('device_mac') || '';
 
-  const requestVoucher = async () => {
-    try {
-      setState(prev => ({ ...prev, loading: true, error: null }));
-      
-      const response = await voucherApi.request({
-        phone: state.phoneNumber,
-        mac: state.deviceInfo.mac,
-        ip: state.deviceInfo.ip,
-      });
-
-      if (response.data.success && response.data.data) {
-        setState(prev => ({ 
-          ...prev, 
-          voucher: response.data.data!.voucher,
-          loading: false 
-        }));
-        writeProgress({
-          mac: state.deviceInfo.mac,
-          phoneNumber: state.phoneNumber,
-          email: state.email,
-          agreedToTerms: state.agreedToTerms,
-          step: 'voucher',
-        });
-
-        toast({
-          title: 'Berhasil',
-          description: response.data.data.message || 'Kode voucher telah dikirim ke WhatsApp',
-        });
-
-        setStep('voucher');
-      }
-    } catch (error) {
-      const errorMsg = handleApiError(error);
-      
-      // Log detailed error for debugging
-      console.error('Request voucher failed');
-      
-      setState(prev => ({ ...prev, error: errorMsg, loading: false }));
-      
-      // Provide more specific error messages
-      let userMessage = errorMsg;
-      if (errorMsg.includes('WhatsApp')) {
-        userMessage = 'Gagal mengirim ke WhatsApp. Pastikan nomor sudah terdaftar WhatsApp.';
-      } else if (errorMsg.includes('phone') || errorMsg.includes('nomor')) {
-        userMessage = 'Nomor telepon tidak valid. Gunakan format 08xxxxxxxxxx.';
-      }
-      
+    if (!mac) {
       toast({
-        title: 'Gagal',
-        description: userMessage,
+        title: 'Tidak dapat terhubung',
+        description: 'Alamat perangkat tidak terdeteksi.',
         variant: 'destructive',
       });
+      return;
     }
-  };
 
-  // Resend voucher - disables old voucher and generates new one
-  const resendVoucher = async () => {
+    setState(prev => ({ ...prev, loading: true, error: null }));
+
     try {
-      setState(prev => ({ ...prev, loading: true, error: null }));
-      
-      const response = await voucherApi.resend({
-        phone: state.phoneNumber,
-        mac: state.deviceInfo.mac,
-        ip: state.deviceInfo.ip,
-      });
-
-      if (response.data.success && response.data.data) {
-        setState(prev => ({ 
-          ...prev, 
-          voucher: response.data.data!.voucher,
-          voucherCode: '', // Clear old voucher code input
-          loading: false 
-        }));
-
-        toast({
-          title: 'Berhasil',
-          description: 'Kode baru telah dikirim ke WhatsApp. Kode lama sudah dinonaktifkan.',
-        });
-      }
-    } catch (error) {
-      const errorMsg = handleApiError(error);
-      setState(prev => ({ ...prev, error: errorMsg, loading: false }));
-      toast({
-        title: 'Gagal',
-        description: errorMsg,
-        variant: 'destructive',
-      });
-    }
-  };
-
-  const redeemVoucher = async () => {
-    try {
-      setState(prev => ({ ...prev, loading: true, error: null }));
-      
-      const response = await voucherApi.redeem({
-        code: state.voucherCode,
-        mac: state.deviceInfo.mac,
-        ip: state.deviceInfo.ip,
-      });
-
-      if (response.data.success) {
-        setState(prev => ({ ...prev, loading: false }));
-
-        toast({
-          title: 'Berhasil',
-          description: response.data.data?.message || 'Voucher berhasil digunakan',
-        });
-
-        setStep('success');
-      }
-    } catch (error) {
-      const errorMsg = handleApiError(error);
-      setState(prev => ({ ...prev, error: errorMsg, loading: false }));
-      toast({
-        title: 'Gagal',
-        description: errorMsg,
-        variant: 'destructive',
-      });
-    }
-  };
-
-  // Phase 3: Authenticate voucher and create Mikrotik session
-  const authenticateVoucher = async () => {
-    try {
-      setState(prev => ({ ...prev, loading: true, error: null }));
-      
-      const response = await voucherApi.authenticate({
-        code: state.voucherCode,
-        mac: state.deviceInfo.mac,
+      const response = await voucherApi.claimFree({
+        mac,
         ip: state.deviceInfo.ip,
         linkOrig: state.deviceInfo.linkOrig,
       });
 
-      if (response.data.success && response.data.data) {
-        const data = response.data.data as AuthenticateVoucherResponse;
+      const data = response.data.data as ClaimFreeVoucherResponse;
 
-        // Sudah punya sesi aktif — langsung ke layar connected
-        if (data.alreadyConnected) {
-          setState(prev => ({ ...prev, session: data.session ?? null, loading: false }));
-          setStep('connected');
-          return;
-        }
+      // Sudah punya sesi aktif
+      if (data.alreadyConnected) {
+        setState(prev => ({ ...prev, loading: false }));
+        setStep('connected');
+        checkSession();
+        return;
+      }
 
-        setState(prev => ({ ...prev, session: data.session ?? null, loading: false }));
-
-        // Opsi A-PAP: submit form native ke $(link-login-only) agar MikroTik
-        // memvalidasi kredensial & membuat sesi secara resmi (bukan via API).
+      // Ada kredensial -> submit form native ke MikroTik (A-PAP)
+      if (data.credentials) {
         const loginAction = state.deviceInfo.linkLoginOnly || state.deviceInfo.linkLogin;
-        const username = data.credentials?.username ?? state.voucherCode.toUpperCase();
-        const password = data.credentials?.password ?? state.voucherCode.toUpperCase();
 
         if (loginAction) {
           toast({
             title: 'Menghubungkan...',
             description: 'Mengalihkan ke router',
           });
-          submitNativeLoginForm(loginAction, state.deviceInfo.linkOrig, username, password);
+          submitNativeLoginForm(
+            loginAction,
+            state.deviceInfo.linkOrig,
+            data.credentials.username,
+            data.credentials.password,
+          );
           return;
         }
 
-        // Fallback (mode dev/mock atau akses langsung tanpa param MikroTik)
+        // Fallback (mode dev/mock tanpa parameter MikroTik)
+        setState(prev => ({ ...prev, loading: false }));
         toast({
           title: 'Berhasil',
           description: 'Terhubung ke internet',
         });
         setStep('connected');
+        return;
       }
+
+      setState(prev => ({ ...prev, loading: false }));
+      toast({
+        title: 'Gagal terhubung',
+        description: 'Tidak ada kredensial yang diterima.',
+        variant: 'destructive',
+      });
     } catch (error) {
       const errorMsg = handleApiError(error);
-      
-      // Log detailed error for debugging
-      console.error('🔴 Authentication Failed:', {
-        error: errorMsg,
-        code: state.voucherCode,
-        mac: state.deviceInfo.mac,
-        ip: state.deviceInfo.ip,
-        rawError: error,
-      });
-      
       setState(prev => ({ ...prev, error: errorMsg, loading: false }));
-      
-      // Provide more specific error messages
-      let userMessage = errorMsg;
-      if (errorMsg.includes('Mikrotik')) {
-        userMessage = 'Koneksi ke router gagal. Silakan coba beberapa saat lagi.';
-      } else if (errorMsg.includes('profile')) {
-        userMessage = 'Profile voucher tidak valid. Hubungi admin.';
-      } else if (errorMsg.includes('expired') || errorMsg.includes('kadaluarsa')) {
-        userMessage = 'Voucher sudah kadaluarsa. Silakan minta voucher baru.';
-      } else if (errorMsg.includes('not found') || errorMsg.includes('tidak ditemukan')) {
-        userMessage = 'Kode voucher tidak valid. Periksa kembali kode Anda.';
-      }
-      
       toast({
         title: 'Gagal Terhubung',
-        description: userMessage,
+        description: errorMsg,
         variant: 'destructive',
       });
     }
   };
 
-  // Phase 3: Check if user has active session (used for manual refresh)
   const checkSession = async () => {
     const mac = state.deviceInfo.mac || localStorage.getItem('device_mac') || '';
-    
     if (!mac) {
       setState(prev => ({ ...prev, checkingSession: false }));
       return;
@@ -642,60 +259,49 @@ export function PortalProvider({ children }: { children: ReactNode }) {
 
     try {
       setState(prev => ({ ...prev, checkingSession: true }));
-      
+
       const response = await voucherApi.checkSession({ mac });
       const data = response.data.data as SessionInfo & { active?: boolean; session?: SessionInfo };
 
-      // Backend returns { active: true/false, session: {...} }
       if (response.data.success && data?.active && data?.session) {
-        // User has active session - go to connected page
-        console.log('✅ Session check: Active session found', data.session);
-        
-        // Cache session info
         localStorage.setItem('portal_session_cache', JSON.stringify({
           active: true,
           mac: mac,
           timestamp: Date.now(),
           session: data.session,
         }));
-        
-        setState(prev => ({ 
-          ...prev, 
+
+        setState(prev => ({
+          ...prev,
           session: data.session,
           currentStep: 'connected',
-          checkingSession: false 
+          checkingSession: false,
         }));
       } else {
-        // No active session - proceed with normal flow
-        console.log('📋 Session check: No active session');
-        // Clear stale cache
         localStorage.removeItem('portal_session_cache');
         setState(prev => ({ ...prev, checkingSession: false }));
       }
     } catch (error) {
-      // If check fails, proceed with normal flow
       console.error('Session check failed:', error);
       setState(prev => ({ ...prev, checkingSession: false }));
     }
   };
 
-  // Phase 3: Disconnect user session
   const disconnectSession = async () => {
     try {
       setState(prev => ({ ...prev, loading: true, error: null }));
-      
+
       const response = await voucherApi.disconnect({
         mac: state.deviceInfo.mac,
       });
 
       if (response.data.success) {
         localStorage.removeItem('portal_session_cache');
-        clearProgress();
-        
-        setState(prev => ({ 
-          ...prev, 
+
+        setState(prev => ({
+          ...prev,
           session: null,
-          loading: false 
+          loading: false,
         }));
 
         toast({
@@ -703,7 +309,6 @@ export function PortalProvider({ children }: { children: ReactNode }) {
           description: response.data.data?.message || 'Anda sudah disconnect dari internet',
         });
 
-        // Reset to video screen
         resetPortal();
       }
     } catch (error) {
@@ -719,7 +324,6 @@ export function PortalProvider({ children }: { children: ReactNode }) {
 
   const resetPortal = () => {
     localStorage.removeItem('portal_session_cache');
-    clearProgress();
 
     setState({
       ...initialState,
@@ -729,23 +333,81 @@ export function PortalProvider({ children }: { children: ReactNode }) {
     loadAdvertisement();
   };
 
+  const setStep = (step: PortalStep) => {
+    setState(prev => ({ ...prev, currentStep: step }));
+  };
+
+  // Init: cek status connected dari query param, lalu cek sesi / muat iklan
+  useEffect(() => {
+    const initializePortal = async () => {
+      const urlInfo = parseDeviceInfoFromUrl();
+      const mac = urlInfo.mac || localStorage.getItem('device_mac') || '';
+
+      // Case 1: redirect dari status.html MikroTik setelah login sukses
+      if (urlInfo.status === 'connected') {
+        window.history.replaceState({}, '', window.location.pathname);
+
+        if (mac) {
+          setState(prev => ({
+            ...prev,
+            currentStep: 'connected',
+            checkingSession: false,
+            session: {
+              mac: mac,
+              ip: urlInfo.ip,
+              username: urlInfo.username || 'Connected',
+            } as SessionInfo,
+          }));
+        }
+        checkSession();
+        return;
+      }
+
+      // Case 2: cek sesi aktif
+      if (mac) {
+        try {
+          const response = await voucherApi.checkSession({ mac });
+          const data = response.data.data as SessionInfo & { active?: boolean; session?: SessionInfo };
+
+          if (response.data.success && data?.active && data?.session) {
+            localStorage.setItem('portal_session_cache', JSON.stringify({
+              active: true,
+              mac,
+              timestamp: Date.now(),
+              session: data.session,
+            }));
+
+            setState(prev => ({
+              ...prev,
+              session: data.session,
+              currentStep: 'connected',
+              checkingSession: false,
+            }));
+            return;
+          }
+        } catch (error) {
+          console.log('Session check skipped:', error);
+        }
+      }
+
+      // Case 3: user baru — muat iklan
+      setState(prev => ({ ...prev, checkingSession: false }));
+      loadAdvertisement();
+    };
+
+    initializePortal();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   return (
     <PortalContext.Provider
       value={{
         state,
         setStep,
-        setPhoneNumber,
-        setEmail,
-        setVoucherCode,
-        setAgreedToTerms,
         loadAdvertisement,
         trackAdView,
         trackAdComplete,
-        trackAdSkip,
-        requestVoucher,
-        resendVoucher,
-        redeemVoucher,
-        authenticateVoucher,
+        claimFreeAccess,
         checkSession,
         disconnectSession,
         resetPortal,

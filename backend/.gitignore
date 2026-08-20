@@ -17,4 +17,3 @@ public/*
 public/videos/*
 !public/videos/.gitkeep
 scripts/
-wa-auth/

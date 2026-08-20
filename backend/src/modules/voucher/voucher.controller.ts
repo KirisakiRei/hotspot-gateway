@@ -20,6 +20,7 @@ import {
   GenerateVoucherDto,
   RequestVoucherDto,
   RedeemVoucherDto,
+  ClaimFreeVoucherDto,
 } from './dto/voucher.dto';
 import {
   AuthenticateVoucherDto,
@@ -194,16 +195,30 @@ export class VoucherController {
   // PORTAL FLOW (Public endpoints)
   // ==========================================
 
+  @Post('claim-free')
+  @Public()
+  @Throttle({ default: { limit: 10, ttl: 60000 } }) // max 10 klaim/min/IP
+  async claimFree(@Body() claimDto: ClaimFreeVoucherDto) {
+    const result = await this.voucherService.claimFreeVoucher(
+      claimDto.mac,
+      claimDto.ip,
+    );
+    return ApiResponseDto.success(
+      result.alreadyConnected ? 'Sudah terhubung' : 'Akses internet siap diaktifkan',
+      result,
+    );
+  }
+
   @Post('request')
   @Public()
-  @Throttle({ default: { limit: 5, ttl: 60000 } }) // max 5 request/min/IP → anti spam WA
+  @Throttle({ default: { limit: 5, ttl: 60000 } }) // max 5 request/min/IP
   async requestVoucher(@Body() requestDto: RequestVoucherDto) {
     const result = await this.voucherService.requestVoucher(
       requestDto.phone,
       requestDto.mac,
       requestDto.ip,
     );
-    return ApiResponseDto.success('Voucher generated and sent to WhatsApp', result);
+    return ApiResponseDto.success('Voucher berhasil dibuat', result);
   }
 
   @Post('resend')
@@ -215,7 +230,7 @@ export class VoucherController {
       requestDto.mac,
       requestDto.ip,
     );
-    return ApiResponseDto.success('Old voucher disabled, new voucher sent to WhatsApp', result);
+    return ApiResponseDto.success('Voucher lama dinonaktifkan, voucher baru dibuat', result);
   }
 
   @Post('redeem')

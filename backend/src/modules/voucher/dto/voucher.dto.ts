@@ -61,3 +61,17 @@ export class RedeemVoucherDto {
   @IsOptional()
   ip?: string;
 }
+
+export class ClaimFreeVoucherDto {
+  @IsString()
+  @IsNotEmpty()
+  mac: string;
+
+  @IsString()
+  @IsOptional()
+  ip?: string;
+
+  @IsString()
+  @IsOptional()
+  linkOrig?: string;
+}
