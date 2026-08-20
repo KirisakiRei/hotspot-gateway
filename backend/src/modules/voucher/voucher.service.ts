@@ -1322,23 +1322,24 @@ export class VoucherService {
    * Check if MAC address has active session
    * Used by portal on load to detect existing connection.
    *
-   * Strategy: DB-first (zero router load), fallback to router only when
-   * the DB has no record (e.g. session was created outside this system).
+   * Strategy: DB-only (zero router load). Router is never queried here.
+   * The portal only needs to know if this device has a known active session
+   * in our system. If not found in DB → show video/connect flow.
    */
   async checkActiveSession(mac: string) {
     this.logger.log(`Checking active session for MAC: ${mac}`);
 
-    // 1. DB-first — query local database, no router load
-    const dbSession = await this.prisma.session.findFirst({
-      where: { macAddress: mac, endedAt: null },
-      orderBy: { startedAt: 'desc' },
-    });
-
-    const voucher = await this.prisma.voucher.findFirst({
-      where: { usedBy: mac, status: VoucherStatus.USED },
-      include: { profile: true },
-      orderBy: { usedAt: 'desc' },
-    });
+    const [dbSession, voucher] = await Promise.all([
+      this.prisma.session.findFirst({
+        where: { macAddress: mac, endedAt: null },
+        orderBy: { startedAt: 'desc' },
+      }),
+      this.prisma.voucher.findFirst({
+        where: { usedBy: mac, status: VoucherStatus.USED },
+        include: { profile: true },
+        orderBy: { usedAt: 'desc' },
+      }),
+    ]);
 
     if (dbSession && voucher) {
       this.logger.log(`Active session found in DB for MAC: ${mac}`);
@@ -1365,44 +1366,8 @@ export class VoucherService {
       };
     }
 
-    // 2. Fallback — tanya router hanya jika DB tidak punya data
-    //    (misal: session dibuat di luar sistem ini)
-    let session: Record<string, unknown> | null = null;
-    try {
-      session = await this.mikrotikService.getActiveSessionByMac(mac);
-    } catch (error: unknown) {
-      this.logger.warn(`Mikrotik unreachable during session check: ${getErrorMessage(error)}`);
-      return { active: false, message: 'Mikrotik unreachable' };
-    }
-
-    if (!session) {
-      this.logger.log(`No active session found for MAC: ${mac}`);
-      return { active: false, message: 'No active session' };
-    }
-
-    this.logger.log(`Active session found in Mikrotik (DB miss) for MAC: ${mac}`);
-
-    return {
-      active: true,
-      session: {
-        mac: session.mac,
-        ip: session.ip,
-        username: session.username,
-        uptime: session.uptime,
-        bytesIn: session.bytesIn,
-        bytesOut: session.bytesOut,
-        voucher: voucher ? {
-          code: voucher.code,
-          profile: {
-            name: voucher.profile.name,
-            duration: voucher.profile.duration,
-            uploadSpeed: voucher.profile.uploadSpeed,
-            downloadSpeed: voucher.profile.downloadSpeed,
-          },
-        } : undefined,
-        expiresAt: voucher?.expiresAt,
-      },
-    };
+    this.logger.log(`No active session found in DB for MAC: ${mac}`);
+    return { active: false, message: 'No active session' };
   }
 
   /**
