@@ -1,4 +1,4 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '@/common/prisma.service';
 import { MikrotikService } from '@/modules/mikrotik/mikrotik.service';
 import { normalizeMac } from '@/common/utils/mac';
@@ -6,52 +6,26 @@ import { getErrorMessage } from '@/common/utils/error';
 import type { MikrotikRecord } from '@/modules/mikrotik/mikrotik.types';
 
 @Injectable()
-export class SessionService implements OnModuleInit {
+export class SessionService {
   private readonly logger = new Logger(SessionService.name);
-  private syncStarted = false;
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly mikrotikService: MikrotikService,
   ) {}
 
-  async onModuleInit() {
-    this.startActiveSessionSync();
-  }
-
   /**
-   * Subscribe ke aliran event /ip/hotspot/active/listen RouterOS
-   * MikroTik secara otomatis mendorong event connect/disconnect real-time
+   * Stream /ip/hotspot/active/listen dinonaktifkan untuk mengurangi beban CPU
+   * router kelas rendah (hAP Lite, 650 MHz, 32 MB RAM).
+   *
+   * Sinkronisasi sesi kini dilakukan secara on-demand:
+   * - Portal memanggil /vouchers/check-session yang membaca DB terlebih dahulu.
+   * - DB diperbarui saat claimFreeVoucher berhasil (create session record).
+   * - Disconnect dipicu secara eksplisit melalui disconnectSession / kickSession.
+   *
+   * Untuk mengaktifkan kembali stream real-time pada hardware yang lebih kuat,
+   * uncomment metode startActiveSessionSync() dan panggil dari onModuleInit().
    */
-  private startActiveSessionSync() {
-    if (this.syncStarted) return;
-    this.syncStarted = true;
-
-    this.mikrotikService
-      .subscribeToActiveSessions('internal-session-sync', (record: MikrotikRecord) => {
-        this.handleMikrotikSessionEvent(record).catch((error) => {
-          this.logger.error(`Gagal memproses event sesi MikroTik: ${getErrorMessage(error)}`);
-        });
-      })
-      .then((ok) => {
-        if (!ok) {
-          this.logger.warn('Stream /listen sesi MikroTik belum tersambung (router offline?) — mencoba lagi dalam 60 detik');
-          setTimeout(() => {
-            this.syncStarted = false;
-            this.startActiveSessionSync();
-          }, 60000);
-        } else {
-          this.logger.log('Sinkronisasi sesi otomatis via /listen MikroTik aktif');
-        }
-      })
-      .catch((error) => {
-        this.logger.error(`Gagal inisialisasi listener sesi: ${getErrorMessage(error)}`);
-        setTimeout(() => {
-          this.syncStarted = false;
-          this.startActiveSessionSync();
-        }, 60000);
-      });
-  }
 
   /**
    * Parsing format bytes MikroTik (e.g. "1.2MiB", "500KiB", "123456")

@@ -767,7 +767,37 @@ export class MikrotikService {
   // SESSION MANAGEMENT
   // ==========================================
 
+  // In-memory cache untuk active session per MAC (TTL 30 detik)
+  // Mencegah request router berulang saat portal di-refresh
+  private readonly sessionCache = new Map<string, { data: Record<string, unknown> | null; expiresAt: number }>();
+  private readonly SESSION_CACHE_TTL_MS = 30_000;
+
+  getActiveSessionByMacFromCache(mac: string): Record<string, unknown> | null | undefined {
+    const cached = this.sessionCache.get(mac);
+    if (!cached) return undefined; // cache miss
+    if (Date.now() > cached.expiresAt) {
+      this.sessionCache.delete(mac);
+      return undefined; // expired
+    }
+    return cached.data; // cache hit (bisa null = "tidak ada sesi")
+  }
+
+  setActiveSessionCache(mac: string, data: Record<string, unknown> | null) {
+    this.sessionCache.set(mac, { data, expiresAt: Date.now() + this.SESSION_CACHE_TTL_MS });
+  }
+
+  invalidateSessionCache(mac: string) {
+    this.sessionCache.delete(mac);
+  }
+
   async getActiveSessionByMac(mac: string) {
+    // Cek cache dulu sebelum tanya router
+    const cached = this.getActiveSessionByMacFromCache(mac);
+    if (cached !== undefined) {
+      this.logger.debug(`Session cache hit for MAC: ${mac}`);
+      return cached;
+    }
+
     await this.ensureConnected();
 
     try {
@@ -777,9 +807,12 @@ export class MikrotikService {
         [],
         10000
       );
-      return Array.isArray(sessions) && sessions.length > 0 ? sessions[0] : null;
+      const result = Array.isArray(sessions) && sessions.length > 0 ? sessions[0] : null;
+      this.setActiveSessionCache(mac, result);
+      return result;
     } catch (error: unknown) {
       this.logger.debug(`No active session found for MAC: ${mac}`);
+      this.setActiveSessionCache(mac, null); // cache miss juga di-cache (30 detik)
       return null;
     }
   }

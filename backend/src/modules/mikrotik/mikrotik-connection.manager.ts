@@ -728,8 +728,8 @@ export class MikrotikConnectionManager implements OnModuleInit, OnModuleDestroy 
           }
         }
       }
-    }, 45000); // 45 detik
-    this.logger.log('Mikrotik keep-alive heartbeat started (45s interval)');
+    }, 300000); // 5 menit — cukup untuk deteksi koneksi terputus tanpa membebani CPU router
+    this.logger.log('Mikrotik keep-alive heartbeat started (5 min interval)');
   }
 
   private stopKeepAlive() {

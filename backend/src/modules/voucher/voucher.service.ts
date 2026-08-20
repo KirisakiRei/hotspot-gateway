@@ -1018,6 +1018,8 @@ export class VoucherService {
         );
       }
       this.logger.log(`Hotspot user siap di router: ${code}`);
+      // Invalidasi cache agar check-session berikutnya tidak membaca data lama
+      this.mikrotikService.invalidateSessionCache(normalizedMac);
     } catch (error: unknown) {
       this.logger.error(`Gagal menyiapkan user MikroTik: ${getErrorMessage(error)}`);
       if (error instanceof BadRequestException) throw error;
@@ -1318,49 +1320,67 @@ export class VoucherService {
 
   /**
    * Check if MAC address has active session
-   * Used by portal on load to detect existing connection
+   * Used by portal on load to detect existing connection.
+   *
+   * Strategy: DB-first (zero router load), fallback to router only when
+   * the DB has no record (e.g. session was created outside this system).
    */
   async checkActiveSession(mac: string) {
     this.logger.log(`Checking active session for MAC: ${mac}`);
-    
-    // 1. Check Mikrotik for active session
-    // Graceful saat router offline: portal harus tetap bisa dimuat
+
+    // 1. DB-first — query local database, no router load
+    const dbSession = await this.prisma.session.findFirst({
+      where: { macAddress: mac, endedAt: null },
+      orderBy: { startedAt: 'desc' },
+    });
+
+    const voucher = await this.prisma.voucher.findFirst({
+      where: { usedBy: mac, status: VoucherStatus.USED },
+      include: { profile: true },
+      orderBy: { usedAt: 'desc' },
+    });
+
+    if (dbSession && voucher) {
+      this.logger.log(`Active session found in DB for MAC: ${mac}`);
+      return {
+        active: true,
+        session: {
+          mac,
+          ip: dbSession.ipAddress,
+          username: voucher.code,
+          uptime: '',
+          bytesIn: dbSession.bytesIn?.toString() ?? '0',
+          bytesOut: dbSession.bytesOut?.toString() ?? '0',
+          voucher: {
+            code: voucher.code,
+            profile: {
+              name: voucher.profile.name,
+              duration: voucher.profile.duration,
+              uploadSpeed: voucher.profile.uploadSpeed,
+              downloadSpeed: voucher.profile.downloadSpeed,
+            },
+          },
+          expiresAt: voucher.expiresAt,
+        },
+      };
+    }
+
+    // 2. Fallback — tanya router hanya jika DB tidak punya data
+    //    (misal: session dibuat di luar sistem ini)
     let session: Record<string, unknown> | null = null;
     try {
       session = await this.mikrotikService.getActiveSessionByMac(mac);
     } catch (error: unknown) {
       this.logger.warn(`Mikrotik unreachable during session check: ${getErrorMessage(error)}`);
-      return {
-        active: false,
-        message: 'Mikrotik unreachable',
-      };
+      return { active: false, message: 'Mikrotik unreachable' };
     }
 
     if (!session) {
-      this.logger.log(`No active session found in Mikrotik for MAC: ${mac}`);
-      return {
-        active: false,
-        message: 'No active session',
-      };
+      this.logger.log(`No active session found for MAC: ${mac}`);
+      return { active: false, message: 'No active session' };
     }
 
-    this.logger.log(`Active session found in Mikrotik: ${session.mac} (${session.username})`);
-
-    // 2. Get voucher info from database
-    const voucher = await this.prisma.voucher.findFirst({
-      where: {
-        usedBy: mac,
-        status: VoucherStatus.USED,
-      },
-      include: { profile: true },
-      orderBy: { usedAt: 'desc' },
-    });
-
-    if (voucher) {
-      this.logger.log(`Voucher record located: ${voucher.code} (profile: ${voucher.profile.name})`);
-    } else {
-      this.logger.warn(`No voucher record located in database for active MAC: ${mac}`);
-    }
+    this.logger.log(`Active session found in Mikrotik (DB miss) for MAC: ${mac}`);
 
     return {
       active: true,
@@ -1378,7 +1398,7 @@ export class VoucherService {
             duration: voucher.profile.duration,
             uploadSpeed: voucher.profile.uploadSpeed,
             downloadSpeed: voucher.profile.downloadSpeed,
-          }
+          },
         } : undefined,
         expiresAt: voucher?.expiresAt,
       },
@@ -1390,6 +1410,9 @@ export class VoucherService {
    * Used by portal logout functionality
    */
   async disconnectSession(mac: string) {
+    // Invalidasi cache agar status koneksi diperbarui segera setelah disconnect
+    this.mikrotikService.invalidateSessionCache(mac);
+
     // 1. Unified kick via SessionService (Router + DB close)
     try {
       await this.sessionService.kickSession(mac);
