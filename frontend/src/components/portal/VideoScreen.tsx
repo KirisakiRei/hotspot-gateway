@@ -2,8 +2,8 @@ import { useState, useEffect, useRef } from 'react';
 import { Play, Volume2, VolumeX, Loader2, AlertCircle, RefreshCw, Wifi } from 'lucide-react';
 import { usePortal } from '@/contexts/PortalContext';
 
-// Timeout maksimal buffering sebelum tombol darurat dibuka (12 detik)
-const BUFFER_STALL_TIMEOUT_MS = 12000;
+// Timeout maksimal buffering sebelum tombol darurat dibuka (5 detik)
+const BUFFER_STALL_TIMEOUT_MS = 5000;
 
 export function VideoScreen() {
   const { state, trackAdView, trackAdComplete, loadAdvertisement, setStep } = usePortal();
@@ -152,7 +152,7 @@ export function VideoScreen() {
     );
   }
 
-  // Tidak ada iklan aktif / error API — tetap bisa lanjut (klaim akses gratis)
+  // Tidak ada iklan aktif / error API — tetap bisa lanjut
   if (!advertisement || error) {
     return (
       <div className="fixed inset-0 bg-gradient-to-br from-gray-900 to-black flex flex-col items-center justify-center p-6">
@@ -165,11 +165,11 @@ export function VideoScreen() {
             {error || 'Anda tetap dapat terhubung ke internet gratis.'}
           </p>
           <button
-            onClick={claimFreeAccess}
+            onClick={() => setStep('connect')}
             className="w-full h-12 rounded-xl bg-primary text-primary-foreground font-semibold hover:opacity-90 transition-all flex items-center justify-center gap-2"
           >
             <Wifi className="w-5 h-5" />
-            Hubungkan ke Internet
+            Lanjutkan ke Koneksi
           </button>
           {error && (
             <button
