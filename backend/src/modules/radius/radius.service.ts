@@ -92,10 +92,10 @@ export class RadiusService {
     const profile = voucher.profile;
     const sessionTimeout = profile.duration * 60; // menit → detik
 
-    // Mikrotik-Rate-Limit format: "Xk/Yk" (upload/download dalam kbps)
-    let rateLimit = '2048k/5120k'; // default 2M up / 5M down
-    if (profile.uploadSpeed && profile.downloadSpeed) {
-      rateLimit = `${profile.uploadSpeed}k/${profile.downloadSpeed}k`;
+    // Mikrotik-Rate-Limit format: "rx-rate/tx-rate" = "download/upload" (kbps)
+    let rateLimit = '5120k/2048k'; // default 5M down / 2M up
+    if (profile.downloadSpeed && profile.uploadSpeed) {
+      rateLimit = `${profile.downloadSpeed}k/${profile.uploadSpeed}k`;
     }
 
     // Tandai voucher ACTIVE + catat MAC jika baru

@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Plus, Settings, Trash2, Edit, X, AlertTriangle, Send, Loader2 } from 'lucide-react';
+import { Plus, Settings, Trash2, Edit, X, AlertTriangle, Send, Loader2, Check } from 'lucide-react';
 import { AdminSidebar } from '@/components/admin/AdminSidebar';
 import { AdminHeader } from '@/components/admin/AdminHeader';
 import { Badge, ActionButton } from '@/components/admin/AdminComponents';
 import { toast } from 'sonner';
-import { voucherApi, type VoucherProfile, type Voucher } from '@/services/api';
+import { voucherApi, type VoucherProfile, type Voucher, settingApi } from '@/services/api';
 import { getErrorMessage } from '@/lib/error';
 
 type ModalType = 'add' | 'edit' | 'delete' | 'generate' | null;
@@ -14,6 +14,10 @@ export default function AdminVouchers() {
   const [profiles, setProfiles] = useState<VoucherProfile[]>([]);
   const [vouchers, setVouchers] = useState<Voucher[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+
+  // Portal access profile mapping (dikelola dari admin, disimpan di Setting DB)
+  const [portalProfileIds, setPortalProfileIds] = useState({ free: '', survey: '' });
+  const [isSavingPortalProfiles, setIsSavingPortalProfiles] = useState(false);
   
   // Modal states
   const [modalType, setModalType] = useState<ModalType>(null);
@@ -26,16 +30,33 @@ export default function AdminVouchers() {
 
   const loadData = async () => {
     try {
-      const [profilesRes, vouchersRes] = await Promise.all([
+      const [profilesRes, vouchersRes, mappingRes] = await Promise.all([
         voucherApi.getProfiles(),
-        voucherApi.getAll()
+        voucherApi.getAll(),
+        settingApi.getPortalProfileMapping(),
       ]);
       setProfiles(profilesRes.data.data!);
       setVouchers(vouchersRes.data.data!);
+      setPortalProfileIds({
+        free: mappingRes.data.data?.freeProfileId || '',
+        survey: mappingRes.data.data?.surveyProfileId || '',
+      });
     } catch (error) {
       toast.error('Gagal memuat data voucher');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const savePortalProfileMapping = async () => {
+    setIsSavingPortalProfiles(true);
+    try {
+      await settingApi.updatePortalProfileMapping(portalProfileIds);
+      toast.success('Profil akses portal disimpan');
+    } catch (error) {
+      toast.error(getErrorMessage(error, 'Gagal menyimpan'));
+    } finally {
+      setIsSavingPortalProfiles(false);
     }
   };
   
@@ -408,6 +429,67 @@ export default function AdminVouchers() {
                   </div>
                 </div>
               ))}
+            </div>
+          </div>
+
+          {/* Portal Access Profile Mapping */}
+          <div className="stat-card">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="font-semibold text-foreground">Profil Akses Portal</h2>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Pilih profil voucher yang dipakai saat user memilih akses di portal
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">
+                  Konek Langsung (1 Jam)
+                </label>
+                <select
+                  value={portalProfileIds.free}
+                  onChange={(e) => setPortalProfileIds(prev => ({ ...prev, free: e.target.value }))}
+                  className="w-full h-10 px-3 rounded-xl bg-secondary border-0 text-sm focus:ring-2 focus:ring-primary"
+                >
+                  <option value="">-- Pilih Profil --</option>
+                  {profiles.map(p => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">
+                  Isi Kuesioner (1 Hari)
+                </label>
+                <select
+                  value={portalProfileIds.survey}
+                  onChange={(e) => setPortalProfileIds(prev => ({ ...prev, survey: e.target.value }))}
+                  className="w-full h-10 px-3 rounded-xl bg-secondary border-0 text-sm focus:ring-2 focus:ring-primary"
+                >
+                  <option value="">-- Pilih Profil --</option>
+                  {profiles.map(p => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="flex justify-end mt-4">
+              <button
+                onClick={savePortalProfileMapping}
+                disabled={isSavingPortalProfiles}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 transition-all disabled:opacity-50"
+              >
+                {isSavingPortalProfiles ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Check className="w-4 h-4" />
+                )}
+                Simpan
+              </button>
             </div>
           </div>
 

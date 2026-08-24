@@ -929,7 +929,7 @@ export class VoucherService {
    * -> MikroTik kirim RADIUS Access-Request ke VPS -> authorize di RadiusService.
    * Tidak ada API call ke MikroTik di sini.
    */
-  async claimFreeVoucher(mac: string, ip?: string, profileId?: string) {
+  async claimFreeVoucher(mac: string, ip?: string, accessType?: string) {
     // 1. Normalisasi MAC
     const normalizedMac = normalizeMac(mac);
     if (!normalizedMac) {
@@ -964,18 +964,32 @@ export class VoucherService {
       };
     }
 
-    // 3. Ambil profile: dari parameter, lalu setting, lalu aktif pertama
-    const generateSettingsRecord = await this.prisma.setting.findUnique({
-      where: { key: 'voucher_generate_settings' },
-    });
+    // 3. Resolve profile dari Settings DB berdasarkan accessType
+    //    accessType: 'free' → Setting('portal_free_profile_id')
+    //    accessType: 'survey' → Setting('portal_survey_profile_id')
+    //    Fallback: voucher_generate_settings → profil aktif pertama
+    let resolvedProfileId = '';
 
-    let resolvedProfileId = profileId || '';
-    if (!resolvedProfileId && generateSettingsRecord?.value) {
-      try {
-        const parsed = JSON.parse(generateSettingsRecord.value);
-        resolvedProfileId = parsed.profileId || '';
-      } catch {
-        this.logger.warn('Gagal parse voucher_generate_settings');
+    if (accessType) {
+      const settingKey = accessType === 'survey' ? 'portal_survey_profile_id' : 'portal_free_profile_id';
+      const settingRecord = await this.prisma.setting.findUnique({ where: { key: settingKey } });
+      if (settingRecord?.value) {
+        resolvedProfileId = settingRecord.value;
+        this.logger.log(`Resolved profile via Setting("${settingKey}") = ${resolvedProfileId}`);
+      }
+    }
+
+    if (!resolvedProfileId) {
+      const generateSettingsRecord = await this.prisma.setting.findUnique({
+        where: { key: 'voucher_generate_settings' },
+      });
+      if (generateSettingsRecord?.value) {
+        try {
+          const parsed = JSON.parse(generateSettingsRecord.value);
+          resolvedProfileId = parsed.profileId || '';
+        } catch {
+          this.logger.warn('Gagal parse voucher_generate_settings');
+        }
       }
     }
 

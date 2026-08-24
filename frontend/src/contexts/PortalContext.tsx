@@ -203,14 +203,12 @@ export function PortalProvider({ children }: { children: ReactNode }) {
     setState(prev => ({ ...prev, loading: true, error: null }));
 
     try {
-      // Kirim profileId sesuai accessType (backend resolve ke profil yang sesuai)
+      // Kirim accessType — backend resolve profil dari Settings DB
       const response = await voucherApi.claimFree({
         mac,
         ip: state.deviceInfo.ip,
         linkOrig: state.deviceInfo.linkOrig,
-        profileId: effectiveAccessType === 'survey'
-          ? (import.meta.env.VITE_SURVEY_PROFILE_ID || undefined)
-          : (import.meta.env.VITE_FREE_PROFILE_ID || undefined),
+        accessType: effectiveAccessType,
       });
 
       const data = response.data.data as ClaimFreeVoucherResponse;

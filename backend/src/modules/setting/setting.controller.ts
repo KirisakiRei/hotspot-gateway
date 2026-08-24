@@ -120,6 +120,39 @@ export class SettingController {
     return this.settingService.getPortalConfig();
   }
 
+  @Get('portal/profile-mapping')
+  @Roles('SUPER_ADMIN', 'ADMIN')
+  async getPortalProfileMapping() {
+    const [free, survey] = await Promise.all([
+      this.settingService.findByKey('portal_free_profile_id'),
+      this.settingService.findByKey('portal_survey_profile_id'),
+    ]);
+    return {
+      success: true,
+      data: {
+        freeProfileId: free?.value || '',
+        surveyProfileId: survey?.value || '',
+      },
+    };
+  }
+
+  @Put('portal/profile-mapping')
+  @Roles('SUPER_ADMIN', 'ADMIN')
+  async updatePortalProfileMapping(
+    @Body() body: { freeProfileId?: string; surveyProfileId?: string },
+  ) {
+    if (body.freeProfileId !== undefined) {
+      await this.settingService.update('portal_free_profile_id', body.freeProfileId, 'portal');
+    }
+    if (body.surveyProfileId !== undefined) {
+      await this.settingService.update('portal_survey_profile_id', body.surveyProfileId, 'portal');
+    }
+    return {
+      success: true,
+      message: 'Portal profile mapping updated',
+    };
+  }
+
   // ==========================================
   // DYNAMIC KEY ROUTES (Must be last)
   // ==========================================

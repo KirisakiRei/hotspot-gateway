@@ -235,6 +235,7 @@ export interface ClaimFreeVoucherRequest {
   mac: string;
   ip?: string;
   linkOrig?: string;
+  accessType?: 'free' | 'survey';
 }
 
 export interface ClaimFreeVoucherResponse {
@@ -526,6 +527,12 @@ export const settingApi = {
     return api.put<ApiResponse>('/settings', settingsArray);
   },
   testMikrotik: (config: Record<string, string>) => api.post<ApiResponse<{ connected: boolean; message: string }>>('/settings/test-mikrotik', config),
+
+  // Portal profile mapping (profil akses gratis "1 jam" vs "kuesioner 1 hari")
+  getPortalProfileMapping: () =>
+    api.get<ApiResponse<{ freeProfileId: string; surveyProfileId: string }>>('/settings/portal/profile-mapping'),
+  updatePortalProfileMapping: (data: { freeProfileId: string; surveyProfileId: string }) =>
+    api.put<ApiResponse>('/settings/portal/profile-mapping', data),
 };
 
 // ==========================================
