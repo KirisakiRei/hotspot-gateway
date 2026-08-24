@@ -146,22 +146,22 @@ export default function AdminQuestionnaire() {
 
   if (isLoading) {
     return (
-      <div className="flex h-screen">
+      <div className="min-h-screen bg-background">
         <AdminSidebar />
-        <div className="flex-1 flex items-center justify-center">
+        <main className="admin-content flex items-center justify-center">
           <Loader2 className="w-8 h-8 animate-spin text-primary" />
-        </div>
+        </main>
       </div>
     );
   }
 
   return (
-    <div className="flex h-screen">
+    <div className="min-h-screen bg-background">
       <AdminSidebar />
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <AdminHeader title="Kuesioner" />
+      <main className="admin-content">
+        <AdminHeader title="Kuesioner" subtitle="Kelola pertanyaan dan jawaban kuesioner" />
 
-        <div className="flex-1 overflow-y-auto p-6">
+        <div className="p-6">
           {/* Tab navigation */}
           <div className="flex gap-2 mb-6">
             <button
@@ -362,7 +362,7 @@ export default function AdminQuestionnaire() {
             </>
           )}
         </div>
-      </div>
+      </main>
     </div>
   );
 }

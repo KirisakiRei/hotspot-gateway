@@ -198,11 +198,22 @@
   .admin-sidebar {
     @apply w-64 bg-sidebar border-r border-sidebar-border;
     @apply flex flex-col h-screen fixed left-0 top-0;
+    transition: width 0.2s ease;
   }
 
   /* Admin content area */
   .admin-content {
     @apply ml-64 min-h-screen bg-background;
+    transition: margin-left 0.2s ease;
+  }
+
+  /* Collapsed sidebar state (dipicu dari AdminSidebar via body class) */
+  .sidebar-collapsed .admin-sidebar {
+    width: 72px;
+  }
+
+  .sidebar-collapsed .admin-content {
+    margin-left: 72px;
   }
 
   /* Stat card */
