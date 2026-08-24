@@ -9,7 +9,7 @@ import {
   MessageBody,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
-import { Logger, UseGuards } from '@nestjs/common';
+import { Logger } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { MikrotikService } from './mikrotik.service';
 import { RedisService } from '@/modules/redis/redis.service';
@@ -204,68 +204,18 @@ export class MikrotikGateway implements OnGatewayInit, OnGatewayConnection, OnGa
       return { success: false, message: 'Client not registered' };
     }
 
-    const { streamType, params } = data;
+    const { streamType } = data;
     this.logger.log(`Stream subscribe request: ${streamType} from client ${client.id}`);
-
-    let success = false;
-    let tag = '';
 
     switch (streamType) {
       case 'sessions':
-        tag = `sessions_${client.id}`;
-        success = await this.mikrotikService.subscribeToActiveSessions(
-          client.id,
-          (data) => {
-            client.emit('stream:data', {
-              type: 'sessions',
-              data,
-              timestamp: new Date().toISOString(),
-            });
-          }
-        );
-        break;
-
       case 'resources':
-        tag = `resources_${client.id}`;
-        success = await this.mikrotikService.subscribeToSystemResources(
-          client.id,
-          (data) => {
-            client.emit('stream:data', {
-              type: 'resources',
-              data,
-              timestamp: new Date().toISOString(),
-            });
-          }
-        );
-        break;
-
       case 'traffic':
-        const interfaceName = String(params?.interface || 'ether1');
-        tag = `traffic_${client.id}_${interfaceName}`;
-        success = await this.mikrotikService.subscribeToInterfaceTraffic(
-          client.id,
-          interfaceName,
-          (data) => {
-            client.emit('stream:data', {
-              type: 'traffic',
-              interface: interfaceName,
-              data,
-              timestamp: new Date().toISOString(),
-            });
-          }
-        );
-        break;
+        return { success: false, message: 'Stream monitoring dinonaktifkan. Gunakan REST API.' };
 
       default:
         return { success: false, message: `Unknown stream type: ${streamType}` };
     }
-
-    if (success) {
-      clientInfo.subscribedStreams.add(tag);
-      this.logger.log(`Client ${client.id} subscribed to stream ${streamType}`);
-    }
-
-    return { success, streamType, tag };
   }
 
   @SubscribeMessage('stream:unsubscribe')

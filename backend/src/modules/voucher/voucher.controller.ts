@@ -202,6 +202,7 @@ export class VoucherController {
     const result = await this.voucherService.claimFreeVoucher(
       claimDto.mac,
       claimDto.ip,
+      claimDto.profileId,
     );
     return ApiResponseDto.success(
       result.alreadyConnected ? 'Sudah terhubung' : 'Akses internet siap diaktifkan',

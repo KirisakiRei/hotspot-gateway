@@ -16,6 +16,8 @@ import { SettingModule } from './modules/setting/setting.module';
 import { LogModule } from './modules/log/log.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { RedisModule } from './modules/redis/redis.module';
+import { RadiusModule } from './modules/radius/radius.module';
+import { QuestionnaireModule } from './modules/questionnaire/questionnaire.module';
 
 @Module({
   imports: [
@@ -39,6 +41,8 @@ import { RedisModule } from './modules/redis/redis.module';
     SettingModule,
     LogModule,
     DashboardModule,
+    RadiusModule,
+    QuestionnaireModule,
   ],
   controllers: [AppController],
   providers: [

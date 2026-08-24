@@ -924,55 +924,65 @@ export class VoucherService {
 
   /**
    * Buat akses gratis untuk satu perangkat (MAC) setelah video iklan selesai.
-   * Alur: video selesai -> klaim -> backend buat voucher + hotspot user di
-   * MikroTik -> frontend POST form native (A-PAP) ke $(link-login-only).
+   * Alur (RADIUS): video selesai -> klaim -> backend buat voucher di DB saja
+   * -> frontend POST form native (A-PAP) ke $(link-login-only)
+   * -> MikroTik kirim RADIUS Access-Request ke VPS -> authorize di RadiusService.
+   * Tidak ada API call ke MikroTik di sini.
    */
-  async claimFreeVoucher(mac: string, ip?: string) {
+  async claimFreeVoucher(mac: string, ip?: string, profileId?: string) {
     // 1. Normalisasi MAC
     const normalizedMac = normalizeMac(mac);
     if (!normalizedMac) {
       throw new BadRequestException('MAC address tidak valid');
     }
 
-    // 2. Cek apakah perangkat sudah punya sesi aktif di MikroTik
-    try {
-      const activeSession = await this.mikrotikService.getActiveSessionByMac(
-        normalizedMac,
-      );
-      if (activeSession) {
-        this.logger.log(`MAC ${normalizedMac} sudah punya sesi aktif`);
-        return {
-          success: true,
-          message: 'Sudah terhubung',
-          alreadyConnected: true,
-          credentials: null,
-        };
-      }
-    } catch (error: unknown) {
-      this.logger.warn(
-        `Gagal cek sesi aktif MikroTik (${getErrorMessage(error)}) — lanjut klaim`,
-      );
+    // 2. Cek apakah MAC sudah punya voucher ACTIVE yang belum kadaluarsa di DB
+    const existingActive = await this.prisma.voucher.findFirst({
+      where: {
+        usedBy: normalizedMac,
+        status: 'ACTIVE',
+        expiresAt: { gt: new Date() },
+      },
+      include: { profile: true },
+    });
+
+    if (existingActive) {
+      this.logger.log(`MAC ${normalizedMac} sudah punya voucher aktif di DB`);
+      return {
+        success: true,
+        message: 'Sudah terhubung',
+        alreadyConnected: true,
+        credentials: {
+          username: existingActive.code,
+          password: existingActive.code,
+        },
+        profile: {
+          name: existingActive.profile.name,
+          duration: existingActive.profile.duration,
+        },
+        expiresAt: existingActive.expiresAt,
+      };
     }
 
-    // 3. Ambil profile dari pengaturan voucher (atau profile aktif pertama)
+    // 3. Ambil profile: dari parameter, lalu setting, lalu aktif pertama
     const generateSettingsRecord = await this.prisma.setting.findUnique({
       where: { key: 'voucher_generate_settings' },
     });
 
-    let profileId = '';
-    if (generateSettingsRecord?.value) {
+    let resolvedProfileId = profileId || '';
+    if (!resolvedProfileId && generateSettingsRecord?.value) {
       try {
         const parsed = JSON.parse(generateSettingsRecord.value);
-        profileId = parsed.profileId || '';
+        resolvedProfileId = parsed.profileId || '';
       } catch {
         this.logger.warn('Gagal parse voucher_generate_settings');
       }
     }
 
     let profile = null as VoucherProfile | null;
-    if (profileId) {
+    if (resolvedProfileId) {
       profile = await this.prisma.voucherProfile.findUnique({
-        where: { id: profileId, isActive: true },
+        where: { id: resolvedProfileId, isActive: true },
       });
     }
     if (!profile) {
@@ -992,86 +1002,18 @@ export class VoucherService {
     const now = new Date();
     const expiresAt = new Date(now.getTime() + profile.duration * 60 * 1000);
 
-    // 5. Buat record voucher (langsung USED — dipakai device ini)
-    const voucher = await this.prisma.voucher.create({
+    // 5. Buat record voucher di DB (status UNUSED — akan diaktifkan oleh RADIUS saat login)
+    await this.prisma.voucher.create({
       data: {
         code,
         profileId: profile.id,
         expiresAt,
-        status: VoucherStatus.USED,
+        status: VoucherStatus.UNUSED,
         usedBy: normalizedMac,
-        activatedAt: now,
-        usedAt: now,
       },
     });
 
-    // 6. Siapkan hotspot user di MikroTik (username = password = kode)
-    try {
-      const userCreated = await this.mikrotikService.createOrUpdateHotspotUser(
-        code,
-        code,
-        profile.name,
-      );
-      if (!userCreated) {
-        throw new BadRequestException(
-          'Gagal membuat user di MikroTik. Profile mungkin tidak sesuai.',
-        );
-      }
-      this.logger.log(`Hotspot user siap di router: ${code}`);
-      // Invalidasi cache agar check-session berikutnya tidak membaca data lama
-      this.mikrotikService.invalidateSessionCache(normalizedMac);
-    } catch (error: unknown) {
-      this.logger.error(`Gagal menyiapkan user MikroTik: ${getErrorMessage(error)}`);
-      if (error instanceof BadRequestException) throw error;
-      throw new InternalServerErrorException(
-        'Gagal menyiapkan user di MikroTik. Silakan hubungi admin.',
-      );
-    }
-
-    // 7. Buat/update user + session di DB
-    try {
-      const existingUser = await this.prisma.user.findUnique({
-        where: { macAddress: normalizedMac },
-      });
-
-      if (existingUser) {
-        await this.prisma.user.update({
-          where: { macAddress: normalizedMac },
-          data: {
-            voucher: { connect: { id: voucher.id } },
-            ipAddress: ip ?? existingUser.ipAddress,
-            status: 'ONLINE',
-            loginAt: now,
-          },
-        });
-      } else {
-        await this.prisma.user.create({
-          data: {
-            phone: `guest-${Date.now()}-${crypto.randomBytes(2).toString('hex')}`,
-            macAddress: normalizedMac,
-            ipAddress: ip || '0.0.0.0',
-            name: 'Guest User',
-            status: 'ONLINE',
-            loginAt: now,
-            voucher: { connect: { id: voucher.id } },
-          },
-        });
-      }
-
-      await this.prisma.session.create({
-        data: {
-          user: { connect: { macAddress: normalizedMac } },
-          startedAt: now,
-          ipAddress: ip || '0.0.0.0',
-          macAddress: normalizedMac,
-        },
-      });
-    } catch (error: unknown) {
-      this.logger.error(
-        `Gagal buat/update user & session: ${getErrorMessage(error)}`,
-      );
-      // Tidak menggagalkan klaim — hotspot user di MikroTik sudah siap
-    }
+    this.logger.log(`Voucher ${code} dibuat untuk MAC ${normalizedMac} (profile: ${profile.name}) — auth via RADIUS`);
 
     // 8. Log
     await this.prisma.systemLog.create({

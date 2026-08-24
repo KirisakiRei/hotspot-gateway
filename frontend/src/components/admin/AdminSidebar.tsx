@@ -8,6 +8,7 @@ import {
   Settings,
   LogOut,
   Router,
+  ClipboardList,
 } from 'lucide-react';
 import { logoutAdmin } from '@/lib/session';
 
@@ -16,6 +17,7 @@ const navItems = [
   { icon: Users, label: 'Pengguna', path: '/admin/users' },
   { icon: Ticket, label: 'Voucher', path: '/admin/vouchers' },
   { icon: Video, label: 'Iklan', path: '/admin/ads' },
+  { icon: ClipboardList, label: 'Kuesioner', path: '/admin/questionnaire' },
   { icon: Router, label: 'Router', path: '/admin/router' },
   { icon: FileText, label: 'Log Sistem', path: '/admin/logs' },
 ];

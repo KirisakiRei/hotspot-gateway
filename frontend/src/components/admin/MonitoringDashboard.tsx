@@ -1,29 +1,21 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Activity, Cpu, HardDrive, Users, Wifi, TrendingUp, TrendingDown, RefreshCw, Clock, Radio, AlertTriangle } from 'lucide-react';
+import { Activity, Cpu, HardDrive, Users, Wifi, TrendingUp, TrendingDown, RefreshCw, Clock, Radio, Info } from 'lucide-react';
 import { StatsCard, ProgressCard } from './MonitoringCards';
-import { mikrotikApi, type MonitoringDashboard } from '@/services/api';
-import { useMonitoringStreams, MonitoringProvider } from '@/contexts/MonitoringContext';
+import { mikrotikApi, type MonitoringDashboard as MonitoringDashboardType } from '@/services/api';
 import { toast } from 'sonner';
 
 interface MonitoringDashboardProps {
   isConnected: boolean;
 }
 
-// Inner component that uses the monitoring context
+// Inner component — live monitoring via WebSocket dinonaktifkan.
+// Dashboard admin sekarang membaca data dari DB (RADIUS accounting).
 function MonitoringDashboardInner({ isConnected }: MonitoringDashboardProps) {
-  // Use WebSocket streaming with fallback to polling
-  const { data: streamData, mode, lastUpdate: streamLastUpdate, connected: wsConnected } = useMonitoringStreams(
-    ['resources', 'sessions', 'traffic'],
-    {}
-  );
-  
-  // Fallback state for polling mode
-  const [dashboardData, setDashboardData] = useState<MonitoringDashboard | null>(null);
+  const [dashboardData, setDashboardData] = useState<MonitoringDashboardType | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
 
-  // Load data via REST API (for polling fallback)
   const loadDashboardData = useCallback(async (silent = false) => {
     if (!silent) setIsLoading(true);
     try {
@@ -32,10 +24,9 @@ function MonitoringDashboardInner({ isConnected }: MonitoringDashboardProps) {
         setDashboardData(response.data.data);
         setLastUpdate(new Date());
       }
-    } catch (error) {
+    } catch {
       if (!silent) {
-        console.error('Error loading monitoring data:', error);
-        toast.error('Gagal memuat data monitoring');
+        setDashboardData(null);
       }
     } finally {
       setIsLoading(false);
@@ -47,23 +38,12 @@ function MonitoringDashboardInner({ isConnected }: MonitoringDashboardProps) {
   useEffect(() => {
     if (!isConnected) return;
     
-    // Only poll if in polling mode
-    if (mode === 'polling' || mode === 'disconnected') {
+    // Live monitoring via WebSocket dinonaktifkan (diganti RADIUS accounting).
+    // Load data via REST saat pertama kali dan refresh manual.
+    if (isConnected) {
       loadDashboardData();
-      
-      // Auto-refresh every 10 seconds in polling mode
-      const interval = setInterval(() => {
-        loadDashboardData(true);
-      }, 10000);
-
-      return () => clearInterval(interval);
-    } else {
-      // In streaming mode, just load initial data once
-      if (!dashboardData) {
-        loadDashboardData(true);
-      }
     }
-  }, [isConnected, mode, loadDashboardData, dashboardData]);
+  }, [isConnected, loadDashboardData]);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
@@ -79,92 +59,42 @@ function MonitoringDashboardInner({ isConnected }: MonitoringDashboardProps) {
   };
 
   const formatUptime = (uptime: string): string => {
-    // Parse Mikrotik uptime format (e.g., "1w2d3h4m5s")
     const match = uptime.match(/(?:(\d+)w)?(?:(\d+)d)?(?:(\d+)h)?(?:(\d+)m)?(?:(\d+)s)?/);
     if (!match) return uptime;
-
     const [, weeks, days, hours, minutes] = match;
     const parts = [];
-    
     if (weeks) parts.push(`${weeks}w`);
     if (days) parts.push(`${days}d`);
     if (hours) parts.push(`${hours}h`);
     if (minutes) parts.push(`${minutes}m`);
-
     return parts.join(' ') || uptime;
   };
 
   if (!isConnected) {
     return (
-      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 text-center">
-        <Wifi className="w-12 h-12 text-yellow-600 mx-auto mb-3" />
-        <p className="text-yellow-800 font-medium">Tidak terhubung ke Mikrotik</p>
-        <p className="text-yellow-600 text-sm mt-1">
-          Hubungkan ke router untuk melihat monitoring
+      <div className="bg-muted border border-border rounded-2xl p-8 text-center">
+        <Info className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
+        <p className="text-foreground font-medium">Live Monitoring Dinonaktifkan</p>
+        <p className="text-muted-foreground text-sm mt-1">
+          Statistik sesi tersedia di Dasbor admin (dari database RADIUS accounting).
         </p>
       </div>
     );
   }
 
-  // Determine which data source to use (streaming or polling)
-  const useStreaming = mode === 'streaming' && wsConnected;
-  
-  // Merge streaming data with dashboard data
-  const system = useStreaming && streamData.resources 
-    ? streamData.resources 
-    : dashboardData?.system || {
-        cpuLoad: 0,
-        freeMemory: 0,
-        totalMemory: 0,
-        freeHddSpace: 0,
-        totalHddSpace: 0,
-        uptime: '0s',
-        version: 'Unknown',
-        boardName: 'Unknown',
-      };
-  
-  const sessions = useStreaming && streamData.sessions 
-    ? streamData.sessions 
-    : dashboardData?.sessions || {
-        totalSessions: 0,
-        totalBytesIn: 0,
-        totalBytesOut: 0,
-        sessions: [],
-      };
-  
-  const iface = useStreaming && streamData.traffic 
-    ? {
-        name: streamData.traffic.name,
-        rxByte: streamData.traffic.rxBytes,
-        txByte: streamData.traffic.txBytes,
-        rxPacket: streamData.traffic.rxPackets,
-        txPacket: streamData.traffic.txPackets,
-        rxError: streamData.traffic.rxErrors,
-        txError: streamData.traffic.txErrors,
-        running: streamData.traffic.running,
-        rxDrop: 0,
-        txDrop: 0,
-      }
-    : dashboardData?.interface || {
-        name: 'ether1',
-        rxByte: 0,
-        txByte: 0,
-        rxPacket: 0,
-        txPacket: 0,
-        rxError: 0,
-        txError: 0,
-        running: false,
-        rxDrop: 0,
-        txDrop: 0,
-      };
-
-  const hotspot = dashboardData?.hotspot || {
-    totalUsers: 0,
-    totalProfiles: 0,
-    activeUsers: 0,
+  const system = dashboardData?.system || {
+    cpuLoad: 0, freeMemory: 0, totalMemory: 0, freeHddSpace: 0, totalHddSpace: 0,
+    uptime: '0s', version: 'Unknown', boardName: 'Unknown',
   };
-
-  const displayLastUpdate = useStreaming ? streamLastUpdate : lastUpdate;
+  const sessions = dashboardData?.sessions || {
+    totalSessions: 0, totalBytesIn: 0, totalBytesOut: 0, sessions: [],
+  };
+  const iface = dashboardData?.interface || {
+    name: 'ether1', rxByte: 0, txByte: 0, rxPacket: 0, txPacket: 0,
+    rxError: 0, txError: 0, running: false, rxDrop: 0, txDrop: 0,
+  };
+  const hotspot = dashboardData?.hotspot || { totalUsers: 0, totalProfiles: 0, activeUsers: 0 };
+  const displayLastUpdate = lastUpdate;
 
   if (isLoading && !dashboardData && !useStreaming) {
     return (
@@ -380,11 +310,7 @@ function MonitoringDashboardInner({ isConnected }: MonitoringDashboardProps) {
   );
 }
 
-// Wrapper component that provides MonitoringContext
+// Wrapper component — WebSocket context tidak lagi diperlukan
 export function MonitoringDashboardSection({ isConnected }: MonitoringDashboardProps) {
-  return (
-    <MonitoringProvider>
-      <MonitoringDashboardInner isConnected={isConnected} />
-    </MonitoringProvider>
-  );
+  return <MonitoringDashboardInner isConnected={isConnected} />;
 }

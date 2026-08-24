@@ -1,55 +1,103 @@
 # MikroTik Hotspot — produksi wifi.rekavia.com
-# Sesuaikan: interface hotspot, out-interface NAT, IP VPS, peer WireGuard.
+# Arsitektur: Direct RADIUS (tanpa VPN/API)
+# VPS menggunakan FreeRADIUS (UDP 1812/1813) langsung dari IP publik router.
+# Tidak ada WireGuard, tidak ada API 8728.
 
+# ============================================================
 # 1. Pool & gateway hotspot
+# ============================================================
 /ip pool add name=hotspot-pool ranges=192.168.10.2-192.168.10.254
 /ip address add address=192.168.10.1/24 interface=bridge-hotspot
 /ip dhcp-server network add address=192.168.10.0/24 gateway=192.168.10.1 dns-server=192.168.10.1
 
-# 2. Captive portal detection
-# JANGAN hijack domain captive detection ke router (192.168.10.1).
-# Biarkan device resolve ke IP asli Apple/Google via DNS upstream.
-# MikroTik akan memblok koneksi (karena belum auth) sehingga device
-# mendeteksi captive portal dan menampilkan popup "Sign in required".
-#
-# www.icloud.com sengaja tidak di-static agar tidak bocor ke WAN sebelum login.
+# ============================================================
+# 2. DNS
+# www.icloud.com diarahkan ke router agar tidak bocor ke WAN sebelum login.
+# JANGAN redirect domain captive detection (connectivitycheck.gstatic.com, dll.)
+# — biarkan MikroTik memblok agar device menampilkan "Sign in required".
+# ============================================================
+/ip dns set allow-remote-requests=yes servers=1.1.1.1,8.8.8.8
 /ip dns static add name=www.icloud.com address=192.168.10.1
 
-# 3. Hotspot profile + halaman login
+# ============================================================
+# 3. RADIUS (Direct ke VPS — tanpa tunnel)
+# Ganti VPS_PUBLIC_IP dan RADIUS_SHARED_SECRET sesuai deployment.
+# NAS-Identifier = system identity (unik per router, lihat step 4).
+# ============================================================
+/radius add \
+    service=hotspot \
+    address=VPS_PUBLIC_IP \
+    secret=RADIUS_SHARED_SECRET \
+    authentication-port=1812 \
+    accounting-port=1813 \
+    timeout=1000 \
+    comment="FreeRADIUS VPS"
+
+# Aktifkan incoming CoA/PoD (opsional — butuh port-forward UDP 3799 di modem)
+/radius incoming set accept=yes port=3799
+
+# ============================================================
+# 4. System identity — unik per router (jadi NAS-Identifier di RADIUS)
+# Ganti ROUTER-001 dengan nama unik tiap lokasi.
+# ============================================================
+/system identity set name=ROUTER-001
+
+# ============================================================
+# 5. Hotspot profile + server
+# use-radius=yes: semua login diteruskan ke FreeRADIUS.
+# ============================================================
 /ip hotspot profile add name=public-wifi \
     hotspot-address=192.168.10.1 \
     dns-name=free.wifi \
     login-by=http-chap,http-pap,cookie,mac-cookie \
     http-cookie-lifetime=1d \
-    use-radius=no \
+    use-radius=yes \
+    radius-accounting=yes \
+    radius-interim-update=1m \
     html-directory=hotspot
 /ip hotspot add name=public-hotspot profile=public-wifi interface=bridge-hotspot address-pool=hotspot-pool
 
-# 4. Walled garden HTTP — portal VPS (port 80)
+# ============================================================
+# 6. Walled garden HTTP — portal VPS bisa diakses sebelum login
+# ============================================================
 /ip hotspot walled-garden add dst-host=wifi.rekavia.com action=allow comment="portal+api"
 
-# 5. Walled garden IP — portal VPS (port 443 HTTPS, bypass SSL intercept)
-# Tanpa ini, browser mendapat SSL error saat memuat portal HTTPS.
+# ============================================================
+# 7. Walled garden IP — bypass SSL intercept untuk portal HTTPS
+# Router TIDAK melakukan SSL termination untuk wifi.rekavia.com.
+# ============================================================
 /ip hotspot walled-garden ip add dst-host=wifi.rekavia.com action=accept comment="Bypass HTTPS Portal"
 
-# 6. DNS + NAT (ganti ether1 sesuai interface WAN)
-/ip dns set allow-remote-requests=yes servers=1.1.1.1,8.8.8.8
+# ============================================================
+# 8. NAT masquerade (ganti ether1 sesuai interface WAN)
+# ============================================================
 /ip firewall nat add chain=srcnat out-interface=ether1 action=masquerade comment="defconf: masquerade"
 
-# 7. Profil user hotspot (selaraskan nama dengan profil voucher di admin)
-/ip hotspot user profile add name="Bronze - 1 Jam" rate-limit=2M/2M session-timeout=1h shared-users=1
-/ip hotspot user profile add name="Silver - 3 Jam" rate-limit=5M/5M session-timeout=3h shared-users=1
-/ip hotspot user profile add name="Gold - 1 Hari" rate-limit=10M/10M session-timeout=1d shared-users=2
+# ============================================================
+# 9. Profil user hotspot lokal (fallback jika RADIUS tidak tersedia)
+# Nama profil ini juga bisa digunakan sebagai Mikrotik-Group di RADIUS reply.
+# ============================================================
+/ip hotspot user profile add name="free-1h"  rate-limit=2M/5M   session-timeout=1h  shared-users=1
+/ip hotspot user profile add name="free-1d"  rate-limit=2M/5M   session-timeout=1d  shared-users=1
+/ip hotspot user profile add name="Bronze"   rate-limit=2M/2M   session-timeout=1h  shared-users=1
+/ip hotspot user profile add name="Silver"   rate-limit=5M/5M   session-timeout=3h  shared-users=1
+/ip hotspot user profile add name="Gold"     rate-limit=10M/10M session-timeout=1d  shared-users=2
 
-# 8. API hanya dari tunnel WireGuard (VPS = 10.8.0.1)
-/ip service set api address=10.8.0.1/32 port=8728 disabled=no
-/ip service set www disabled=yes
-/ip service set ftp disabled=yes
-/ip service set telnet disabled=yes
+# ============================================================
+# 10. Nonaktifkan service yang tidak diperlukan
+# API (8728) dinonaktifkan — tidak lagi digunakan oleh backend RADIUS.
+# ============================================================
+/ip service set api     disabled=yes
+/ip service set www     disabled=yes
+/ip service set ftp     disabled=yes
+/ip service set telnet  disabled=yes
 
-# 9. Firewall input: izinkan API dari WireGuard sebelum rule drop
-/ip firewall filter add chain=input protocol=tcp dst-port=8728 \
-    src-address=10.8.0.1 action=accept comment="API dari VPS" \
-    place-before=[find comment="defconf: drop all not coming from LAN"]
+# ============================================================
+# 11. Firewall input: tolak akses API dari luar jika belum dimatikan
+# ============================================================
+/ip firewall filter add \
+    chain=input protocol=tcp dst-port=8728 \
+    action=drop comment="Block API — tidak digunakan"
 
-:put "Hotspot produksi siap. Upload login.html ke Files/hotspot/"
+:put "Hotspot Direct RADIUS siap. Upload login.html ke Files/hotspot/"
+:put "Pastikan: VPS_PUBLIC_IP, RADIUS_SHARED_SECRET, dan /system identity sudah diganti."

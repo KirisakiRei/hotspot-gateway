@@ -57,40 +57,37 @@ export class MikrotikController {
 
   // ==========================================
   // PHASE 4: MONITORING ENDPOINTS
+  // Live monitoring dinonaktifkan (arsitektur Direct RADIUS tanpa API).
+  // Dashboard admin membaca data dari DB (RADIUS accounting).
   // ==========================================
 
   @Get('monitoring/system')
   @UseGuards(JwtAuthGuard)
   async getSystemResources() {
-    const resources = await this.mikrotikService.getSystemResources();
-    return ApiResponseDto.success('System resources retrieved', resources);
+    return ApiResponseDto.success('Live monitoring dinonaktifkan', null);
   }
 
   @Get('monitoring/sessions')
   @UseGuards(JwtAuthGuard)
   async getSessionsStats() {
-    const stats = await this.mikrotikService.getActiveSessionsStats();
-    return ApiResponseDto.success('Active sessions statistics retrieved', stats);
+    return ApiResponseDto.success('Live monitoring dinonaktifkan', null);
   }
 
   @Get('monitoring/interface')
   @UseGuards(JwtAuthGuard)
   async getInterfaceStats() {
-    const stats = await this.mikrotikService.getInterfaceStats('ether1');
-    return ApiResponseDto.success('Interface statistics retrieved', stats);
+    return ApiResponseDto.success('Live monitoring dinonaktifkan', null);
   }
 
   @Get('monitoring/hotspot')
   @UseGuards(JwtAuthGuard)
   async getHotspotStats() {
-    const stats = await this.mikrotikService.getHotspotStats();
-    return ApiResponseDto.success('Hotspot statistics retrieved', stats);
+    return ApiResponseDto.success('Live monitoring dinonaktifkan', null);
   }
 
   @Get('monitoring/dashboard')
   @UseGuards(JwtAuthGuard)
   async getMonitoringDashboard() {
-    const dashboard = await this.mikrotikService.getMonitoringDashboard();
-    return ApiResponseDto.success('Monitoring dashboard data retrieved', dashboard);
+    return ApiResponseDto.success('Live monitoring dinonaktifkan', null);
   }
 }

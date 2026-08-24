@@ -368,3 +368,45 @@ enum SettingType {
   JSON
   PASSWORD
 }
+
+// ==========================================
+// QUESTIONNAIRE
+// ==========================================
+
+model QuestionnaireField {
+  id          String                 @id @default(uuid(7))
+  key         String                 @unique
+  label       String
+  type        QuestionnaireFieldType
+  options     Json?
+  placeholder String?
+  required    Boolean                @default(false)
+  order       Int                    @default(0)
+  isActive    Boolean                @default(true)
+  createdAt   DateTime               @default(now())
+  updatedAt   DateTime               @updatedAt
+
+  @@index([isActive, order])
+  @@map("questionnaire_fields")
+}
+
+enum QuestionnaireFieldType {
+  TEXT
+  EMAIL
+  PHONE
+  NUMBER
+  SELECT
+  TEXTAREA
+}
+
+model QuestionnaireSubmission {
+  id         String   @id @default(uuid(7))
+  macAddress String
+  voucherId  String?
+  answers    Json
+  createdAt  DateTime @default(now())
+
+  @@index([macAddress])
+  @@index([voucherId])
+  @@map("questionnaire_submissions")
+}

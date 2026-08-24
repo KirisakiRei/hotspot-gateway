@@ -74,4 +74,9 @@ export class ClaimFreeVoucherDto {
   @IsString()
   @IsOptional()
   linkOrig?: string;
+
+  /** ID profil yang dipilih user (1 jam vs kuesioner/1 hari). Optional — fallback ke default. */
+  @IsString()
+  @IsOptional()
+  profileId?: string;
 }

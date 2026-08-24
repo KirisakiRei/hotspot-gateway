@@ -2,7 +2,10 @@ import React, { createContext, useContext, useState, ReactNode, useEffect } from
 import { advertisementApi, voucherApi, type Advertisement, type SessionInfo, type TrackAdRequest, type ClaimFreeVoucherResponse, handleApiError } from '@/services/api';
 import { useToast } from '@/hooks/use-toast';
 
-export type PortalStep = 'video' | 'connect' | 'connected';
+export type PortalStep = 'video' | 'choice' | 'questionnaire' | 'connect' | 'connected';
+
+/** accessType: 'free' = 1 jam langsung, 'survey' = 1 hari setelah kuesioner */
+export type AccessType = 'free' | 'survey';
 
 interface DeviceInfo {
   mac: string;
@@ -15,6 +18,7 @@ interface DeviceInfo {
 
 interface PortalState {
   currentStep: PortalStep;
+  accessType: AccessType;
   advertisement: Advertisement | null;
   session: SessionInfo | null;
   loading: boolean;
@@ -25,11 +29,11 @@ interface PortalState {
 
 interface PortalContextType {
   state: PortalState;
-  setStep: (step: PortalStep) => void;
+  setStep: (step: PortalStep, opts?: { accessType?: AccessType }) => void;
   loadAdvertisement: () => Promise<void>;
   trackAdView: () => Promise<void>;
   trackAdComplete: (watchTime?: number) => Promise<void>;
-  claimFreeAccess: () => Promise<void>;
+  claimFreeAccess: (accessType?: AccessType) => Promise<void>;
   checkSession: () => Promise<void>;
   disconnectSession: () => Promise<void>;
   resetPortal: () => void;
@@ -71,6 +75,7 @@ const initialDeviceInfo = parseDeviceInfoFromUrl();
 
 const initialState: PortalState = {
   currentStep: 'video',
+  accessType: 'free',
   advertisement: null,
   session: null,
   loading: false,
@@ -173,9 +178,18 @@ export function PortalProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // Klaim akses gratis (video selesai -> auto buat voucher + login native)
-  const claimFreeAccess = async () => {
+  const setStep = (step: PortalStep, opts?: { accessType?: AccessType }) => {
+    setState(prev => ({
+      ...prev,
+      currentStep: step,
+      ...(opts?.accessType !== undefined && { accessType: opts.accessType }),
+    }));
+  };
+
+  // Klaim akses gratis. accessType: 'free' = 1 jam, 'survey' = 1 hari (setelah kuesioner)
+  const claimFreeAccess = async (accessType?: AccessType) => {
     const mac = state.deviceInfo.mac || localStorage.getItem('device_mac') || '';
+    const effectiveAccessType = accessType ?? state.accessType;
 
     if (!mac) {
       toast({
@@ -189,10 +203,14 @@ export function PortalProvider({ children }: { children: ReactNode }) {
     setState(prev => ({ ...prev, loading: true, error: null }));
 
     try {
+      // Kirim profileId sesuai accessType (backend resolve ke profil yang sesuai)
       const response = await voucherApi.claimFree({
         mac,
         ip: state.deviceInfo.ip,
         linkOrig: state.deviceInfo.linkOrig,
+        profileId: effectiveAccessType === 'survey'
+          ? (import.meta.env.VITE_SURVEY_PROFILE_ID || undefined)
+          : (import.meta.env.VITE_FREE_PROFILE_ID || undefined),
       });
 
       const data = response.data.data as ClaimFreeVoucherResponse;
@@ -336,10 +354,6 @@ export function PortalProvider({ children }: { children: ReactNode }) {
       deviceInfo: state.deviceInfo,
     });
     loadAdvertisement();
-  };
-
-  const setStep = (step: PortalStep) => {
-    setState(prev => ({ ...prev, currentStep: step }));
   };
 
   // Init: cek status connected dari query param, lalu cek sesi / muat iklan

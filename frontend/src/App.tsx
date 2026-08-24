@@ -61,6 +61,7 @@ const AdminAds      = lazy(() => import("./pages/admin/AdminAds"));
 const AdminLogs     = lazy(() => import("./pages/admin/AdminLogs"));
 const AdminRouter   = lazy(() => import("./pages/admin/AdminRouter"));
 const AdminSettings = lazy(() => import("./pages/admin/AdminSettings"));
+const AdminQuestionnaire = lazy(() => import("./pages/admin/AdminQuestionnaire"));
 
 import NotFound from "./pages/NotFound";
 
@@ -111,6 +112,7 @@ const App = () => (
             <Route path="/admin/logs"      element={<RequireAuth><AdminLogs /></RequireAuth>} />
             <Route path="/admin/router"    element={<RequireAuth><AdminRouter /></RequireAuth>} />
             <Route path="/admin/settings"  element={<RequireAuth><AdminSettings /></RequireAuth>} />
+            <Route path="/admin/questionnaire" element={<RequireAuth><AdminQuestionnaire /></RequireAuth>} />
 
             <Route path="*" element={<NotFound />} />
           </Routes>

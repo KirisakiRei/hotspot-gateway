@@ -1,5 +1,7 @@
 import { PortalProvider, usePortal } from '@/contexts/PortalContext';
 import { VideoScreen } from '@/components/portal/VideoScreen';
+import { ChoiceScreen } from '@/components/portal/ChoiceScreen';
+import { QuestionnaireScreen } from '@/components/portal/QuestionnaireScreen';
 import { ConnectScreen } from '@/components/portal/ConnectScreen';
 import { ConnectedScreen } from '@/components/portal/ConnectedScreen';
 import { Loader2 } from 'lucide-react';
@@ -21,6 +23,10 @@ function PortalFlow() {
       return <ConnectedScreen />;
     case 'connect':
       return <ConnectScreen />;
+    case 'questionnaire':
+      return <QuestionnaireScreen />;
+    case 'choice':
+      return <ChoiceScreen />;
     case 'video':
     default:
       return <VideoScreen />;

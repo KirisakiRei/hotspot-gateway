@@ -611,6 +611,59 @@ export const logApi = {
 };
 
 // ==========================================
+// QUESTIONNAIRE
+// ==========================================
+
+export type QuestionnaireFieldType = 'TEXT' | 'EMAIL' | 'PHONE' | 'NUMBER' | 'SELECT' | 'TEXTAREA';
+
+export interface QuestionnaireField {
+  id: string;
+  key: string;
+  label: string;
+  type: QuestionnaireFieldType;
+  options?: string[];
+  placeholder?: string;
+  required: boolean;
+  order: number;
+  isActive: boolean;
+}
+
+export interface QuestionnaireAnswer {
+  key: string;
+  label: string;
+  value: string;
+}
+
+export const questionnaireApi = {
+  getActiveFields: () =>
+    api.get<ApiResponse<QuestionnaireField[]>>('/questionnaire/fields/active', {
+      skipAuthRedirect: true,
+    }),
+  submit: (data: { mac: string; voucherId?: string; answers: QuestionnaireAnswer[] }) =>
+    api.post<ApiResponse<{ id: string }>>('/questionnaire/submit', data, {
+      skipAuthRedirect: true,
+    }),
+
+  // Admin
+  getAllFields: (includeInactive = false) =>
+    api.get<ApiResponse<QuestionnaireField[]>>('/questionnaire/admin/fields', {
+      params: { includeInactive },
+    }),
+  createField: (data: Omit<QuestionnaireField, 'id' | 'isActive' | 'createdAt' | 'updatedAt'> & { isActive?: boolean }) =>
+    api.post<ApiResponse<QuestionnaireField>>('/questionnaire/admin/fields', data),
+  updateField: (id: string, data: Partial<QuestionnaireField>) =>
+    api.patch<ApiResponse<QuestionnaireField>>(`/questionnaire/admin/fields/${id}`, data),
+  deleteField: (id: string) =>
+    api.delete<ApiResponse<{ deleted: boolean }>>(`/questionnaire/admin/fields/${id}`),
+  getSubmissions: (page = 1, limit = 20) =>
+    api.get<ApiResponse<{ total: number; page: number; limit: number; totalPages: number; items: Array<{ id: string; macAddress: string; voucherId?: string; answers: QuestionnaireAnswer[]; createdAt: string }> }>>('/questionnaire/admin/submissions', {
+      params: { page, limit },
+    }),
+  getSubmissionsByMac: (mac: string) =>
+    api.get<ApiResponse<Array<{ id: string; macAddress: string; voucherId?: string; answers: QuestionnaireAnswer[]; createdAt: string }>>>(`/questionnaire/admin/submissions/mac/${mac}`),
+};
+
+// ==========================================
 // HELPERS
 // ==========================================
 
