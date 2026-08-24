@@ -1,8 +1,8 @@
 import { IsString, IsOptional } from 'class-validator';
 
 export interface RadiusAcceptResponse {
-  control: { Auth_Type: string };
-  reply: { Session_Timeout: number; 'Mikrotik-Rate-Limit': string };
+  control: { 'Auth-Type': string };
+  reply: { 'Session-Timeout': number; 'Mikrotik-Rate-Limit': string };
 }
 
 export class RadiusAuthorizeDto {

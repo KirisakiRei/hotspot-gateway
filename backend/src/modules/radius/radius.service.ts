@@ -118,10 +118,10 @@ export class RadiusService {
 
     return {
       control: {
-        Auth_Type: 'Accept',
+        'Auth-Type': 'Accept',
       },
       reply: {
-        Session_Timeout: sessionTimeout,
+        'Session-Timeout': sessionTimeout,
         'Mikrotik-Rate-Limit': rateLimit,
       },
     };
