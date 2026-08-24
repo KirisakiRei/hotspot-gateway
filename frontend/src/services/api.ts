@@ -660,6 +660,8 @@ export const questionnaireApi = {
     api.post<ApiResponse<QuestionnaireField>>('/questionnaire/admin/fields', data),
   updateField: (id: string, data: Partial<QuestionnaireField>) =>
     api.patch<ApiResponse<QuestionnaireField>>(`/questionnaire/admin/fields/${id}`, data),
+  reorderFields: (orderedIds: string[]) =>
+    api.post<ApiResponse<QuestionnaireField[]>>('/questionnaire/admin/fields/reorder', { orderedIds }),
   deleteField: (id: string) =>
     api.delete<ApiResponse<{ deleted: boolean }>>(`/questionnaire/admin/fields/${id}`),
   getSubmissions: (page = 1, limit = 20) =>
@@ -668,6 +670,63 @@ export const questionnaireApi = {
     }),
   getSubmissionsByMac: (mac: string) =>
     api.get<ApiResponse<Array<{ id: string; macAddress: string; voucherId?: string; answers: QuestionnaireAnswer[]; createdAt: string }>>>(`/questionnaire/admin/submissions/mac/${mac}`),
+};
+
+// ==========================================
+// ROUTER MANAGEMENT (DIRECT RADIUS GATEWAY)
+// ==========================================
+
+export interface RouterGateway {
+  id: string;
+  name: string;
+  location?: string;
+  host: string;
+  port: number;
+  status: 'ACTIVE' | 'DISABLED';
+  lastSeenAt?: string;
+  activeSessionsCount: number;
+  isOnline: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface RouterActiveSession {
+  id: string;
+  macAddress: string;
+  ipAddress: string;
+  router: string;
+  routerLocation: string;
+  userName: string;
+  voucherCode: string;
+  profileName: string;
+  bytesIn: number;
+  bytesOut: number;
+  totalBytes: number;
+  uptimeSec: number;
+  startedAt: string;
+  expiresAt?: string;
+}
+
+export interface RouterSetupScript {
+  routerName: string;
+  vpsIp: string;
+  portalDomain: string;
+  script: string;
+}
+
+export const routerApi = {
+  getAll: () => api.get<ApiResponse<RouterGateway[]>>('/routers'),
+  getById: (id: string) => api.get<ApiResponse<RouterGateway>>(`/routers/${id}`),
+  getActiveSessions: (routerId?: string) =>
+    api.get<ApiResponse<RouterActiveSession[]>>('/routers/active-sessions', {
+      params: routerId ? { routerId } : {},
+    }),
+  getScript: (id: string) => api.get<ApiResponse<RouterSetupScript>>(`/routers/${id}/script`),
+  create: (data: { name: string; location?: string; host: string; port?: number; status?: 'ACTIVE' | 'DISABLED' }) =>
+    api.post<ApiResponse<RouterGateway>>('/routers', data),
+  update: (id: string, data: Partial<RouterGateway>) =>
+    api.patch<ApiResponse<RouterGateway>>(`/routers/${id}`, data),
+  delete: (id: string) => api.delete<ApiResponse<{ deleted: boolean }>>(`/routers/${id}`),
 };
 
 // ==========================================

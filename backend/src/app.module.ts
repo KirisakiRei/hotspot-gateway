@@ -18,6 +18,7 @@ import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { RedisModule } from './modules/redis/redis.module';
 import { RadiusModule } from './modules/radius/radius.module';
 import { QuestionnaireModule } from './modules/questionnaire/questionnaire.module';
+import { RouterModule } from './modules/router/router.module';
 
 @Module({
   imports: [
@@ -43,6 +44,7 @@ import { QuestionnaireModule } from './modules/questionnaire/questionnaire.modul
     DashboardModule,
     RadiusModule,
     QuestionnaireModule,
+    RouterModule,
   ],
   controllers: [AppController],
   providers: [

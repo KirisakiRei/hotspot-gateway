@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Trash2, Edit, Check, X, Loader2, ClipboardList } from 'lucide-react';
+import { Plus, Trash2, Edit, Check, X, Loader2, ClipboardList, GripVertical, ArrowUp, ArrowDown } from 'lucide-react';
 import { AdminSidebar } from '@/components/admin/AdminSidebar';
 import { AdminHeader } from '@/components/admin/AdminHeader';
 import { Badge, ActionButton, DataTable } from '@/components/admin/AdminComponents';
@@ -43,6 +43,8 @@ export default function AdminQuestionnaire() {
   const [isLoading, setIsLoading] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
 
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+
   // Form state
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
@@ -53,7 +55,6 @@ export default function AdminQuestionnaire() {
     options: '',
     placeholder: '',
     required: false,
-order: 1,
     isActive: true,
   });
 
@@ -78,7 +79,7 @@ order: 1,
   };
 
   const resetForm = () => {
-    setFormData({ key: '', label: '', type: 'TEXT', options: '', placeholder: '', required: false, order: 1, isActive: true });
+    setFormData({ key: '', label: '', type: 'TEXT', options: '', placeholder: '', required: false, isActive: true });
     setEditId(null);
     setShowForm(false);
   };
@@ -91,7 +92,6 @@ order: 1,
       options: (field.options as string[])?.join('\n') || '',
       placeholder: field.placeholder || '',
       required: field.required,
-      order: field.order,
       isActive: field.isActive,
     });
     setEditId(field.id);
@@ -120,7 +120,6 @@ order: 1,
         ...(formData.type === 'SELECT' && formData.options.trim() ? { options: formData.options.split('\n').filter(s => s.trim()) } : {}),
         placeholder: formData.placeholder || undefined,
         required: formData.required,
-        order: formData.order,
         isActive: formData.isActive,
       };
 
@@ -137,6 +136,61 @@ order: 1,
       toast.error(getErrorMessage(error, 'Gagal menyimpan field'));
     } finally {
       setIsProcessing(false);
+    }
+  };
+
+  const handleMoveOrder = async (index: number, direction: 'up' | 'down') => {
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= fields.length) return;
+
+    const newFields = [...fields];
+    const [movedItem] = newFields.splice(index, 1);
+    newFields.splice(targetIndex, 0, movedItem);
+
+    // Update state dulu agar UI responsif seketika
+    setFields(newFields);
+
+    try {
+      const orderedIds = newFields.map(f => f.id);
+      await questionnaireApi.reorderFields(orderedIds);
+      toast.success('Urutan pertanyaan diperbarui');
+    } catch (error) {
+      toast.error(getErrorMessage(error, 'Gagal memperbarui urutan'));
+      loadData(); // rollback jika gagal
+    }
+  };
+
+  const handleDragStart = (e: React.DragEvent, index: number) => {
+    setDraggedIndex(index);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleDrop = async (e: React.DragEvent, targetIndex: number) => {
+    e.preventDefault();
+    if (draggedIndex === null || draggedIndex === targetIndex) {
+      setDraggedIndex(null);
+      return;
+    }
+
+    const newFields = [...fields];
+    const [movedItem] = newFields.splice(draggedIndex, 1);
+    newFields.splice(targetIndex, 0, movedItem);
+
+    setDraggedIndex(null);
+    setFields(newFields);
+
+    try {
+      const orderedIds = newFields.map(f => f.id);
+      await questionnaireApi.reorderFields(orderedIds);
+      toast.success('Urutan pertanyaan diperbarui');
+    } catch (error) {
+      toast.error(getErrorMessage(error, 'Gagal memperbarui urutan'));
+      loadData();
     }
   };
 
@@ -237,7 +291,7 @@ order: 1,
                         </p>
                       )}
                     </div>
-                    <div>
+                    <div className="col-span-2 sm:col-span-1">
                       <label className="block text-sm font-medium text-foreground mb-1">Tipe</label>
                       <select
                         value={formData.type}
@@ -248,16 +302,6 @@ order: 1,
                           <option key={val} value={val}>{label}</option>
                         ))}
                       </select>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-foreground mb-1">Urutan</label>
-                      <input
-                        type="number"
-                        min={1}
-                        value={formData.order}
-                        onChange={e => setFormData(p => ({ ...p, order: parseInt(e.target.value) || 1 }))}
-                        className="w-full h-10 px-3 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
-                      />
                     </div>
                   </div>
 
@@ -313,9 +357,46 @@ order: 1,
                   Belum ada pertanyaan. Klik "Tambah" untuk membuat.
                 </div>
               ) : (
-                <DataTable headers={['Key', 'Label', 'Tipe', 'Wajib', 'Status', 'Aksi']}>
-                  {fields.map(field => (
-                    <tr key={field.id}>
+                <DataTable headers={['Urutan', 'Key', 'Label', 'Tipe', 'Wajib', 'Status', 'Aksi']}>
+                  {fields.map((field, index) => (
+                    <tr
+                      key={field.id}
+                      draggable
+                      onDragStart={e => handleDragStart(e, index)}
+                      onDragOver={handleDragOver}
+                      onDrop={e => handleDrop(e, index)}
+                      className={`transition-colors cursor-grab active:cursor-grabbing ${
+                        draggedIndex === index ? 'opacity-40 bg-primary/10 border-dashed border-primary' : 'hover:bg-muted/40'
+                      }`}
+                    >
+                      <td className="w-24">
+                        <div className="flex items-center gap-1.5">
+                          <GripVertical className="w-4 h-4 text-muted-foreground cursor-grab active:cursor-grabbing shrink-0" />
+                          <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-secondary text-xs font-semibold">
+                            {index + 1}
+                          </span>
+                          <div className="flex flex-col gap-0.5 ml-1">
+                            <button
+                              type="button"
+                              disabled={index === 0}
+                              onClick={(e) => { e.stopPropagation(); handleMoveOrder(index, 'up'); }}
+                              className="p-0.5 text-muted-foreground hover:text-foreground disabled:opacity-20 disabled:hover:text-muted-foreground transition-colors"
+                              title="Pindah ke atas"
+                            >
+                              <ArrowUp className="w-3 h-3" />
+                            </button>
+                            <button
+                              type="button"
+                              disabled={index === fields.length - 1}
+                              onClick={(e) => { e.stopPropagation(); handleMoveOrder(index, 'down'); }}
+                              className="p-0.5 text-muted-foreground hover:text-foreground disabled:opacity-20 disabled:hover:text-muted-foreground transition-colors"
+                              title="Pindah ke bawah"
+                            >
+                              <ArrowDown className="w-3 h-3" />
+                            </button>
+                          </div>
+                        </div>
+                      </td>
                       <td className="font-mono text-xs">{field.key}</td>
                       <td className="font-medium">{field.label}</td>
                       <td><Badge variant="default">{FIELD_TYPE_LABELS[field.type as FieldType] || field.type}</Badge></td>

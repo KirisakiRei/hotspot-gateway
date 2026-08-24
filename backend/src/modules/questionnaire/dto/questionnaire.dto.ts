@@ -68,6 +68,11 @@ export class UpdateQuestionnaireFieldDto {
   isActive?: boolean;
 }
 
+export class ReorderFieldsDto {
+  @IsArray()
+  orderedIds: string[];
+}
+
 export class SubmitQuestionnaireDto {
   @IsString()
   mac: string;

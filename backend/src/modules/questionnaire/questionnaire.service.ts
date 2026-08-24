@@ -48,6 +48,16 @@ export class QuestionnaireService {
       throw new BadRequestException('Field SELECT memerlukan opsi (options)');
     }
 
+    // Jika order tidak ditentukan, ambil urutan terbesar + 1
+    let order = dto.order;
+    if (order === undefined || order === null) {
+      const maxField = await this.prisma.questionnaireField.findFirst({
+        orderBy: { order: 'desc' },
+        select: { order: true },
+      });
+      order = (maxField?.order ?? 0) + 1;
+    }
+
     return this.prisma.questionnaireField.create({
       data: {
         key: dto.key,
@@ -56,10 +66,22 @@ export class QuestionnaireService {
         options: dto.options ? dto.options : undefined,
         placeholder: dto.placeholder,
         required: dto.required ?? false,
-        order: dto.order ?? 0,
+        order,
         isActive: dto.isActive ?? true,
       },
     });
+  }
+
+  async reorderFields(orderedIds: string[]) {
+    // Jalankan updates secara batch transaction
+    const updates = orderedIds.map((id, index) =>
+      this.prisma.questionnaireField.update({
+        where: { id },
+        data: { order: index + 1 },
+      }),
+    );
+    await this.prisma.$transaction(updates);
+    return this.getFields(true);
   }
 
   async updateField(id: string, dto: UpdateQuestionnaireFieldDto) {

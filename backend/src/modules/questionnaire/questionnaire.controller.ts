@@ -15,6 +15,7 @@ import { QuestionnaireService } from './questionnaire.service';
 import {
   CreateQuestionnaireFieldDto,
   UpdateQuestionnaireFieldDto,
+  ReorderFieldsDto,
   SubmitQuestionnaireDto,
 } from './dto/questionnaire.dto';
 import { JwtAuthGuard } from '@/common/guards/jwt-auth.guard';
@@ -84,6 +85,15 @@ export class QuestionnaireController {
   async updateField(@Param('id') id: string, @Body() dto: UpdateQuestionnaireFieldDto) {
     const field = await this.questionnaireService.updateField(id, dto);
     return ApiResponseDto.success('Field berhasil diupdate', field);
+  }
+
+  @Post('admin/fields/reorder')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(AdminRole.SUPER_ADMIN, AdminRole.ADMIN)
+  @HttpCode(HttpStatus.OK)
+  async reorderFields(@Body() dto: ReorderFieldsDto) {
+    const fields = await this.questionnaireService.reorderFields(dto.orderedIds);
+    return ApiResponseDto.success('Urutan field berhasil diperbarui', fields);
   }
 
   @Delete('admin/fields/:id')
