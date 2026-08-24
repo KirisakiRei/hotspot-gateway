@@ -18,6 +18,16 @@ const FIELD_TYPE_LABELS: Record<FieldType, string> = {
   TEXTAREA: 'Teks Panjang',
 };
 
+/** Ubah label menjadi slug (key) otomatis: "Nama Lengkap" → "nama_lengkap" */
+const slugify = (text: string): string => {
+  return text
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .replace(/_+/g, '_');
+};
+
 interface SubmissionRow {
   id: string;
   macAddress: string;
@@ -43,7 +53,7 @@ export default function AdminQuestionnaire() {
     options: '',
     placeholder: '',
     required: false,
-    order: 0,
+order: 1,
     isActive: true,
   });
 
@@ -68,7 +78,7 @@ export default function AdminQuestionnaire() {
   };
 
   const resetForm = () => {
-    setFormData({ key: '', label: '', type: 'TEXT', options: '', placeholder: '', required: false, order: 0, isActive: true });
+    setFormData({ key: '', label: '', type: 'TEXT', options: '', placeholder: '', required: false, order: 1, isActive: true });
     setEditId(null);
     setShowForm(false);
   };
@@ -89,15 +99,22 @@ export default function AdminQuestionnaire() {
   };
 
   const handleSave = async () => {
-    if (!formData.key.trim() || !formData.label.trim()) {
-      toast.error('Key dan Label wajib diisi');
+    if (!formData.label.trim()) {
+      toast.error('Label wajib diisi');
+      return;
+    }
+
+    // Auto-generate key dari label saat tambah baru; saat edit, pakai key yang sudah ada
+    const key = editId ? formData.key : slugify(formData.label);
+    if (!key) {
+      toast.error('Gagal membuat kunci dari label');
       return;
     }
 
     setIsProcessing(true);
     try {
       const payload = {
-        key: formData.key.trim().toLowerCase().replace(/\s+/g, '_'),
+        key,
         label: formData.label.trim(),
         type: formData.type,
         ...(formData.type === 'SELECT' && formData.options.trim() ? { options: formData.options.split('\n').filter(s => s.trim()) } : {}),
@@ -205,26 +222,20 @@ export default function AdminQuestionnaire() {
                     {editId ? 'Edit Field' : 'Tambah Field Baru'}
                   </h3>
                   <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-foreground mb-1">Key (slug)</label>
-                      <input
-                        type="text"
-                        value={formData.key}
-                        onChange={e => setFormData(p => ({ ...p, key: e.target.value }))}
-                        disabled={!!editId}
-                        placeholder="nama_lengkap"
-                        className="w-full h-10 px-3 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-foreground mb-1">Label</label>
+                    <div className="col-span-2">
+                      <label className="block text-sm font-medium text-foreground mb-1">Pertanyaan</label>
                       <input
                         type="text"
                         value={formData.label}
                         onChange={e => setFormData(p => ({ ...p, label: e.target.value }))}
-                        placeholder="Nama Lengkap"
+                        placeholder="contoh: Nama Lengkap"
                         className="w-full h-10 px-3 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
                       />
+                      {!editId && formData.label.trim() && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Kunci: <span className="font-mono">{slugify(formData.label)}</span>
+                        </p>
+                      )}
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-foreground mb-1">Tipe</label>
@@ -242,8 +253,9 @@ export default function AdminQuestionnaire() {
                       <label className="block text-sm font-medium text-foreground mb-1">Urutan</label>
                       <input
                         type="number"
+                        min={1}
                         value={formData.order}
-                        onChange={e => setFormData(p => ({ ...p, order: parseInt(e.target.value) || 0 }))}
+                        onChange={e => setFormData(p => ({ ...p, order: parseInt(e.target.value) || 1 }))}
                         className="w-full h-10 px-3 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
                       />
                     </div>

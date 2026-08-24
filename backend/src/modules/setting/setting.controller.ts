@@ -14,6 +14,8 @@ import { MikrotikService } from '@/modules/mikrotik/mikrotik.service';
 import { JwtAuthGuard } from '@/common/guards/jwt-auth.guard';
 import { RolesGuard } from '@/common/guards/roles.guard';
 import { Roles } from '@/common/decorators/roles.decorator';
+import { ApiResponseDto } from '@/common/dto/api-response.dto';
+import { AdminRole } from '@prisma/client';
 
 @Controller('settings')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -26,7 +28,7 @@ export class SettingController {
   ) {}
 
   @Get()
-  @Roles('SUPER_ADMIN', 'ADMIN')
+  @Roles(AdminRole.SUPER_ADMIN, AdminRole.ADMIN)
   async getSettings(@Query('group') group?: string) {
     // Mask secret agar tidak bocor ke klien
     return this.settingService.findAll(group, { maskSecrets: true });
@@ -34,7 +36,7 @@ export class SettingController {
 
   // Specific routes must come before dynamic :key routes
   @Get('voucher/generate-settings')
-  @Roles('SUPER_ADMIN', 'ADMIN')
+  @Roles(AdminRole.SUPER_ADMIN, AdminRole.ADMIN)
   async getVoucherGenerateSettings() {
     this.logger.debug('Retrieving voucher generation settings');
     
@@ -75,7 +77,7 @@ export class SettingController {
   }
 
   @Put('voucher/generate-settings')
-  @Roles('SUPER_ADMIN', 'ADMIN')
+  @Roles(AdminRole.SUPER_ADMIN, AdminRole.ADMIN)
   async updateVoucherGenerateSettings(
     @Body() settings: { profileId?: string; prefix?: string; length?: number; format?: string },
   ) {
@@ -105,7 +107,7 @@ export class SettingController {
   }
 
   @Get('mikrotik')
-  @Roles('SUPER_ADMIN', 'ADMIN')
+  @Roles(AdminRole.SUPER_ADMIN, AdminRole.ADMIN)
   async getMikrotikSettings() {
     const config = await this.settingService.getMikrotikConfig();
     return {
@@ -115,29 +117,26 @@ export class SettingController {
   }
 
   @Get('portal')
-  @Roles('SUPER_ADMIN', 'ADMIN')
+  @Roles(AdminRole.SUPER_ADMIN, AdminRole.ADMIN)
   async getPortalSettings() {
     return this.settingService.getPortalConfig();
   }
 
   @Get('portal/profile-mapping')
-  @Roles('SUPER_ADMIN', 'ADMIN')
+  @Roles(AdminRole.SUPER_ADMIN, AdminRole.ADMIN)
   async getPortalProfileMapping() {
     const [free, survey] = await Promise.all([
       this.settingService.findByKey('portal_free_profile_id'),
       this.settingService.findByKey('portal_survey_profile_id'),
     ]);
-    return {
-      success: true,
-      data: {
-        freeProfileId: free?.value || '',
-        surveyProfileId: survey?.value || '',
-      },
-    };
+    return ApiResponseDto.success('Portal profile mapping retrieved', {
+      freeProfileId: free?.value || '',
+      surveyProfileId: survey?.value || '',
+    });
   }
 
   @Put('portal/profile-mapping')
-  @Roles('SUPER_ADMIN', 'ADMIN')
+  @Roles(AdminRole.SUPER_ADMIN, AdminRole.ADMIN)
   async updatePortalProfileMapping(
     @Body() body: { freeProfileId?: string; surveyProfileId?: string },
   ) {
@@ -147,10 +146,7 @@ export class SettingController {
     if (body.surveyProfileId !== undefined) {
       await this.settingService.update('portal_survey_profile_id', body.surveyProfileId, 'portal');
     }
-    return {
-      success: true,
-      message: 'Portal profile mapping updated',
-    };
+    return ApiResponseDto.success('Portal profile mapping updated');
   }
 
   // ==========================================
@@ -158,13 +154,13 @@ export class SettingController {
   // ==========================================
 
   @Get(':key')
-  @Roles('SUPER_ADMIN', 'ADMIN')
+  @Roles(AdminRole.SUPER_ADMIN, AdminRole.ADMIN)
   async getSettingByKey(@Param('key') key: string) {
     return this.settingService.findByKey(key);
   }
 
   @Put(':key')
-  @Roles('SUPER_ADMIN', 'ADMIN')
+  @Roles(AdminRole.SUPER_ADMIN, AdminRole.ADMIN)
   async updateSetting(
     @Param('key') key: string,
     @Body('value') value: string,
@@ -173,7 +169,7 @@ export class SettingController {
   }
 
   @Put()
-  @Roles('SUPER_ADMIN', 'ADMIN')
+  @Roles(AdminRole.SUPER_ADMIN, AdminRole.ADMIN)
   async updateMultipleSettings(
     @Body() settings: Array<{ key: string; value: string }>,
   ) {
@@ -185,7 +181,7 @@ export class SettingController {
   }
 
   @Post('test-mikrotik')
-  @Roles('SUPER_ADMIN', 'ADMIN')
+  @Roles(AdminRole.SUPER_ADMIN, AdminRole.ADMIN)
   async testMikrotikConnection() {
     try {
       const config = await this.settingService.getMikrotikConfig();

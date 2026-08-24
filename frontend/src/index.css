@@ -197,7 +197,7 @@
   /* Admin sidebar */
   .admin-sidebar {
     @apply w-64 bg-sidebar border-r border-sidebar-border;
-    @apply flex flex-col h-screen fixed left-0 top-0;
+    @apply flex flex-col h-screen fixed left-0 top-0 z-20;
     transition: width 0.2s ease;
   }
 

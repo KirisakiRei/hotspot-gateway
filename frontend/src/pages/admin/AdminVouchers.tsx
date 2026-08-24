@@ -33,13 +33,18 @@ export default function AdminVouchers() {
       const [profilesRes, vouchersRes, mappingRes] = await Promise.all([
         voucherApi.getProfiles(),
         voucherApi.getAll(),
-        settingApi.getPortalProfileMapping(),
+        settingApi.getPortalProfileMapping().catch(() => null),
       ]);
-      setProfiles(profilesRes.data.data!);
-      setVouchers(vouchersRes.data.data!);
+      const loadedProfiles = profilesRes.data.data || [];
+      setProfiles(loadedProfiles);
+      setVouchers(vouchersRes.data.data || []);
+      
+      const freeId = mappingRes?.data?.data?.freeProfileId || '';
+      const surveyId = mappingRes?.data?.data?.surveyProfileId || '';
+
       setPortalProfileIds({
-        free: mappingRes.data.data?.freeProfileId || '',
-        survey: mappingRes.data.data?.surveyProfileId || '',
+        free: freeId,
+        survey: surveyId,
       });
     } catch (error) {
       toast.error('Gagal memuat data voucher');
@@ -51,7 +56,10 @@ export default function AdminVouchers() {
   const savePortalProfileMapping = async () => {
     setIsSavingPortalProfiles(true);
     try {
-      await settingApi.updatePortalProfileMapping(portalProfileIds);
+      await settingApi.updatePortalProfileMapping({
+        freeProfileId: portalProfileIds.free,
+        surveyProfileId: portalProfileIds.survey,
+      });
       toast.success('Profil akses portal disimpan');
     } catch (error) {
       toast.error(getErrorMessage(error, 'Gagal menyimpan'));
