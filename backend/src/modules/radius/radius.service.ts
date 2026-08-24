@@ -21,34 +21,34 @@ export class RadiusService {
   async authorize(dto: RadiusAuthorizeDto): Promise<RadiusAcceptResponse> {
     const code = dto.username?.trim().toUpperCase();
     const mac = dto.callingStationId ? normalizeMac(dto.callingStationId) : null;
-    const nasId = dto.nasIdentifier?.trim() || dto.nasIpAddress?.trim() || 'unknown';
+    const nasId = dto.nasIdentifier?.trim() || 'unknown';
+    const sourceIp = dto.nasIpAddress?.trim() || 'dynamic';
 
-    this.logger.log(`RADIUS authorize: user=${code} mac=${mac} nas=${nasId}`);
+    this.logger.log(`RADIUS authorize: user=${code} mac=${mac} nas=${nasId} srcIp=${sourceIp}`);
 
     if (!code) {
       throw new UnauthorizedException('Username kosong');
     }
 
-    // Resolve router berdasarkan NAS-Identifier
-    const router = await this.prisma.router.findFirst({
+    // Resolve router berdasarkan NAS-Identifier (Identity Router MikroTik)
+    let router = await this.prisma.router.findFirst({
       where: {
-        OR: [
-          { name: nasId },
-          { host: nasId },
-        ],
+        name: nasId,
         status: 'ACTIVE',
       },
     });
 
-    if (!router) {
-      this.logger.warn(`RADIUS authorize: router tidak ditemukan untuk NAS=${nasId}`);
-      // Tetap lanjutkan — tidak blokir jika router belum terdaftar di DB
-    } else {
-      // Update lastSeenAt router
+    if (router) {
+      // Update lastSeenAt & update IP publik sumber router yang aktif saat ini
       await this.prisma.router.update({
         where: { id: router.id },
-        data: { lastSeenAt: new Date() },
+        data: {
+          lastSeenAt: new Date(),
+          ...(sourceIp !== 'dynamic' && sourceIp !== '0.0.0.0' && { host: sourceIp }),
+        },
       }).catch(() => {/* non-fatal */});
+    } else {
+      this.logger.warn(`RADIUS authorize: router tidak ditemukan untuk NAS-Identifier=${nasId}`);
     }
 
     // Cari voucher berdasarkan kode
@@ -136,23 +136,27 @@ export class RadiusService {
     const code = dto.username?.trim().toUpperCase();
     const mac = dto.callingStationId ? normalizeMac(dto.callingStationId) : null;
     const ip = dto.framedIpAddress?.trim() || '0.0.0.0';
-    const nasId = dto.nasIdentifier?.trim() || dto.nasIpAddress?.trim() || 'unknown';
+    const nasId = dto.nasIdentifier?.trim() || 'unknown';
+    const sourceIp = dto.nasIpAddress?.trim() || 'dynamic';
 
-    this.logger.log(`RADIUS accounting: type=${statusType} user=${code} mac=${mac} nas=${nasId}`);
+    this.logger.log(`RADIUS accounting: type=${statusType} user=${code} mac=${mac} nas=${nasId} srcIp=${sourceIp}`);
 
     if (!code || !statusType) return;
 
-    // Update lastSeenAt router
+    // Update lastSeenAt & update IP publik sumber router
     const router = await this.prisma.router.findFirst({
       where: {
-        OR: [{ name: nasId }, { host: nasId }],
+        name: nasId,
         status: 'ACTIVE',
       },
     });
     if (router) {
       await this.prisma.router.update({
         where: { id: router.id },
-        data: { lastSeenAt: new Date() },
+        data: {
+          lastSeenAt: new Date(),
+          ...(sourceIp !== 'dynamic' && sourceIp !== '0.0.0.0' && { host: sourceIp }),
+        },
       }).catch(() => {/* non-fatal */});
     }
 

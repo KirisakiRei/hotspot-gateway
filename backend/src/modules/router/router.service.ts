@@ -101,7 +101,7 @@ export class RouterService {
       data: {
         name: dto.name.trim(),
         location: dto.location?.trim() || null,
-        host: dto.host.trim(),
+        host: dto.host?.trim() || 'dynamic',
         port: dto.port || 8728,
         radiusSecret: dto.radiusSecret || null,
         status: dto.status || 'ACTIVE',

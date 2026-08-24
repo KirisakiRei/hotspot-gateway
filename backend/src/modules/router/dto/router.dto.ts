@@ -2,24 +2,25 @@ import { IsString, IsOptional, IsInt, IsBoolean, Min, Max } from 'class-validato
 
 export class CreateRouterDto {
   @IsString()
-  name: string; // Identifier NAS, contoh: ROUTER-001
+  name: string; // Identifier NAS (MikroTik System Identity), contoh: ROUTER-001
 
   @IsOptional()
   @IsString()
-  location?: string; // contoh: Kafe Lantai 1 / Lobby
+  location?: string; // contoh: Kafe Lantai 1 / Cabang A
 
+  @IsOptional()
   @IsString()
-  host: string; // IP Publik atau domain router / IP gateway
+  host?: string; // IP Publik sumber (opsional, auto-terdeteksi dari RADIUS packet)
 
   @IsOptional()
   @IsInt()
   @Min(1)
   @Max(65535)
-  port?: number; // default 8728 (atau port CoA 3799)
+  port?: number;
 
   @IsOptional()
   @IsString()
-  radiusSecret?: string; // custom shared secret (opsional, jika beda dengan default)
+  radiusSecret?: string;
 
   @IsOptional()
   @IsString()

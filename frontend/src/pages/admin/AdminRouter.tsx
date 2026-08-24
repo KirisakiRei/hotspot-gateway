@@ -85,7 +85,7 @@ export default function AdminRouter() {
     setFormData({
       name: '',
       location: '',
-      host: '127.0.0.1',
+      host: 'dynamic',
       port: 8728,
       status: 'ACTIVE',
     });
@@ -97,7 +97,7 @@ export default function AdminRouter() {
     setFormData({
       name: router.name,
       location: router.location || '',
-      host: router.host,
+      host: router.host || 'dynamic',
       port: router.port,
       status: router.status,
     });
@@ -108,10 +108,6 @@ export default function AdminRouter() {
   const handleSave = async () => {
     if (!formData.name.trim()) {
       toast.error('Nama router / NAS-Identifier wajib diisi');
-      return;
-    }
-    if (!formData.host.trim()) {
-      toast.error('Host / IP router wajib diisi');
       return;
     }
 
@@ -351,15 +347,18 @@ export default function AdminRouter() {
 
                 <div>
                   <label className="block text-xs font-medium text-foreground mb-1">
-                    Host / IP Publik Router
+                    Host / IP Publik Sumber (Opsional)
                   </label>
                   <input
                     type="text"
                     value={formData.host}
                     onChange={e => setFormData(p => ({ ...p, host: e.target.value }))}
-                    placeholder="127.0.0.1 / dynamic"
+                    placeholder="dynamic (otomatis terdeteksi)"
                     className="w-full h-10 px-3 font-mono rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
                   />
+                  <p className="text-[11px] text-muted-foreground mt-1">
+                    IP publik router akan terdeteksi otomatis saat router mengirim paket RADIUS.
+                  </p>
                 </div>
 
                 <div>
