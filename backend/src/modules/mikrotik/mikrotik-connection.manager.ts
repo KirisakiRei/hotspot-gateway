@@ -137,18 +137,9 @@ export class MikrotikConnectionManager implements OnModuleInit, OnModuleDestroy 
   // ==========================================
 
   async onModuleInit() {
-    this.logger.log('Checking initial Mikrotik connection...');
-    try {
-      // Non-blocking quick check (3 detik) saat server start
-      const connected = await this.connectWithTimeout(3000);
-      if (connected) {
-        this.logger.log('Initial Mikrotik connection established successfully');
-      } else {
-        this.logger.warn('Mikrotik is currently offline. Web portal will operate in offline-safe mode.');
-      }
-    } catch (error: unknown) {
-      this.logger.warn(`Mikrotik offline at startup (${getErrorMessage(error)}). Web portal will operate in offline-safe mode.`);
-    }
+    // Direct RADIUS tidak menggunakan RouterOS API. Jangan auto-connect ke
+    // API 8728 yang sengaja dimatikan; koneksi manual legacy tetap tersedia.
+    this.logger.log('RouterOS API auto-connect disabled (Direct RADIUS mode).');
   }
 
   async onModuleDestroy() {

@@ -752,6 +752,35 @@ export class VoucherService {
       };
     }
 
+    // Retry setelah login RADIUS gagal tidak boleh mencetak voucher baru untuk
+    // MAC yang sama. Pakai kembali kredensial UNUSED yang masih valid.
+    const pendingVoucher = await this.prisma.voucher.findFirst({
+      where: {
+        usedBy: normalizedMac,
+        status: VoucherStatus.UNUSED,
+        expiresAt: { gt: new Date() },
+      },
+      include: { profile: true },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (pendingVoucher) {
+      this.logger.log(`Menggunakan ulang voucher pending ${pendingVoucher.code} untuk MAC ${normalizedMac}`);
+      return {
+        success: true,
+        message: 'Akses internet siap diaktifkan',
+        alreadyConnected: false,
+        credentials: {
+          username: pendingVoucher.code,
+          password: pendingVoucher.code,
+        },
+        profile: {
+          name: pendingVoucher.profile.name,
+          duration: pendingVoucher.profile.duration,
+        },
+        expiresAt: pendingVoucher.expiresAt,
+      };
+    }
+
     // 3. Resolve profile dari Settings DB berdasarkan accessType
     //    accessType: 'free' → Setting('portal_free_profile_id')
     //    accessType: 'survey' → Setting('portal_survey_profile_id')

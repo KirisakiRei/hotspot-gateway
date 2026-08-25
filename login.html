@@ -3,7 +3,6 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="refresh" content="0;url=https://wifi.rekavia.com/portal?mac=$(mac)&ip=$(ip)&link-orig=$(link-orig)&link-login=$(link-login)&link-login-only=$(link-login-only)">
     <title>Menghubungkan...</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -32,13 +31,13 @@
         <div class="spinner"></div>
         <p>Mengalihkan ke portal WiFi...</p>
         <p style="margin-top:16px;font-size:13px;">
-            <a href="https://wifi.rekavia.com/portal?mac=$(mac)&ip=$(ip)&link-orig=$(link-orig)&link-login=$(link-login)&link-login-only=$(link-login-only)">
+            <a href="https://wifi.rekavia.com/portal?mac=$(mac)&ip=$(ip)&link-orig=$(link-orig)&link-login=$(link-login)&link-login-only=$(link-login-only)&error=$(error)">
                 Ketuk di sini jika tidak berpindah otomatis
             </a>
         </p>
     </div>
     <script>
-        var url = 'https://wifi.rekavia.com/portal?mac=$(mac)&ip=$(ip)&link-orig=$(link-orig)&link-login=$(link-login)&link-login-only=$(link-login-only)';
+        var url = 'https://wifi.rekavia.com/portal?mac=$(mac)&ip=$(ip)&link-orig=$(link-orig)&link-login=$(link-login)&link-login-only=$(link-login-only)&error=$(error)';
         window.location.replace(url);
     </script>
 </body>

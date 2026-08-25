@@ -25,6 +25,11 @@ export function ConnectScreen() {
           <p className="text-sm text-muted-foreground max-w-xs mx-auto">
             Pilihan akses Anda siap diaktifkan. Klik tombol di bawah untuk terhubung ke internet.
           </p>
+          {state.error && (
+            <p className="mt-3 rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+              Login router ditolak: {state.error}
+            </p>
+          )}
         </div>
 
         <div className="bg-card border border-border rounded-xl p-4 mb-8 space-y-3">

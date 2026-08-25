@@ -18,6 +18,7 @@ export function VideoScreen() {
   const [isMuted, setIsMuted] = useState(true);
   const [videoEnded, setVideoEnded] = useState(false);
   const [videoError, setVideoError] = useState<string | null>(null);
+  const [videoStalled, setVideoStalled] = useState(false);
   const [stallBypass, setStallBypass] = useState(false);
   const [videoDuration, setVideoDuration] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
@@ -49,6 +50,9 @@ export function VideoScreen() {
   const startStallTimeout = () => {
     clearStallTimeout();
     stallTimeoutRef.current = setTimeout(() => {
+      videoRef.current?.pause();
+      setIsBuffering(false);
+      setVideoStalled(true);
       setStallBypass(true);
     }, BUFFER_STALL_TIMEOUT_MS);
   };
@@ -58,6 +62,7 @@ export function VideoScreen() {
     if (advertisement) {
       setVideoEnded(false);
       setVideoError(null);
+      setVideoStalled(false);
       setStallBypass(false);
       setVideoDuration(advertisement.duration || 0);
       setCurrentTime(0);
@@ -102,6 +107,7 @@ export function VideoScreen() {
   const handlePlaying = () => {
     clearStallTimeout();
     setIsBuffering(false);
+    setVideoStalled(false);
     setIsPlaying(true);
   };
 
@@ -121,6 +127,7 @@ export function VideoScreen() {
     clearCompletionFallback();
     setIsPlaying(false);
     setIsBuffering(false);
+    setVideoStalled(false);
     setVideoEnded(true);
     setCurrentTime(videoDuration);
   };
@@ -130,6 +137,7 @@ export function VideoScreen() {
     clearCompletionFallback();
     setIsPlaying(false);
     setIsBuffering(false);
+    setVideoStalled(false);
     setVideoError('Video gagal diputar. Anda tetap dapat melanjutkan.');
   };
 
@@ -239,10 +247,18 @@ export function VideoScreen() {
         </video>
 
         {/* Indikator Buffering */}
-        {isBuffering && !videoError && (
+        {isBuffering && !videoError && !videoStalled && (
           <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-black/60 gap-3">
             <Loader2 className="w-10 h-10 text-primary animate-spin" />
             <p className="text-white text-sm font-medium">Memuat video...</p>
+          </div>
+        )}
+
+        {videoStalled && !videoError && (
+          <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-black/75 gap-3 p-6 text-center">
+            <AlertCircle className="w-12 h-12 text-yellow-500" />
+            <p className="text-white text-sm font-medium">Video sedang tidak dapat dimuat.</p>
+            <p className="text-white/70 text-xs">Anda dapat melanjutkan untuk memilih akses internet.</p>
           </div>
         )}
 
@@ -255,7 +271,7 @@ export function VideoScreen() {
         )}
 
         {/* Tombol Play Manual jika Autoplay Ditolak */}
-        {!isPlaying && !isBuffering && !videoError && !videoEnded && (
+        {!isPlaying && !isBuffering && !videoError && !videoStalled && !videoEnded && (
           <button
             onClick={handlePlay}
             className="absolute inset-0 flex items-center justify-center bg-black/40 transition-opacity z-20"
@@ -273,7 +289,7 @@ export function VideoScreen() {
             <span className="text-white/80 text-sm font-medium">Iklan</span>
             <span className="px-3 py-1.5 rounded-full bg-black/60 backdrop-blur-sm">
               <span className="text-sm font-semibold text-white">
-                {isUnlocked ? 'Selesai' : `Sisa ${remaining} dtk`}
+                {isUnlocked ? 'Selesai' : videoStalled ? 'Dihentikan' : `Sisa ${remaining} dtk`}
               </span>
             </span>
           </div>

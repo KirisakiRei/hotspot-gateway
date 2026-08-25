@@ -244,13 +244,19 @@ export function PortalProvider({ children }: { children: ReactNode }) {
           return;
         }
 
-        // Fallback (mode dev/mock tanpa parameter MikroTik)
-        setState(prev => ({ ...prev, loading: false }));
+        // Jangan pura-pura connected bila parameter MikroTik hilang. Itu
+        // menyembunyikan masalah login.html dan meninggalkan voucher UNUSED.
+        setState(prev => ({
+          ...prev,
+          loading: false,
+          currentStep: 'connect',
+          error: 'Parameter link-login-only dari MikroTik tidak tersedia.',
+        }));
         toast({
-          title: 'Berhasil',
-          description: 'Terhubung ke internet',
+          title: 'Data login router tidak lengkap',
+          description: 'Perbarui login.html MikroTik lalu coba kembali.',
+          variant: 'destructive',
         });
-        setStep('connected');
         return;
       }
 
@@ -380,7 +386,21 @@ export function PortalProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      // Case 2: cek sesi aktif
+      // Case 2: MikroTik mengembalikan login gagal. Jangan kembali ke video
+      // atau membuat voucher baru; tampilkan kembali aksi koneksi dengan error.
+      if (urlInfo.error) {
+        window.history.replaceState({}, '', window.location.pathname);
+        setState(prev => ({
+          ...prev,
+          deviceInfo: urlInfo,
+          currentStep: 'connect',
+          error: urlInfo.error,
+          checkingSession: false,
+        }));
+        return;
+      }
+
+      // Case 3: cek sesi aktif
       if (mac) {
         try {
           const response = await voucherApi.checkSession({ mac });
@@ -407,7 +427,7 @@ export function PortalProvider({ children }: { children: ReactNode }) {
         }
       }
 
-      // Case 3: user baru — muat iklan
+      // Case 4: user baru — muat iklan
       setState(prev => ({ ...prev, checkingSession: false }));
       loadAdvertisement();
     };
