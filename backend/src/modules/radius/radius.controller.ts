@@ -16,7 +16,11 @@ import { RadiusAuthorizeDto, RadiusAccountingDto } from './dto/radius.dto';
 /**
  * Endpoint untuk FreeRADIUS rlm_rest.
  * Hanya bisa diakses dari localhost (FreeRADIUS).
- * Guard: cek X-Radius-Secret header + source IP = 127.0.0.1.
+ * Guard utama: source IP harus localhost. Header X-Radius-Secret digunakan
+ * sebagai defense-in-depth bila rlm_rest meneruskannya. Beberapa build
+ * FreeRADIUS 3 tidak mengirim custom header dari block global `headers`,
+ * sehingga menjadikannya syarat mutlak membuat autentikasi RADIUS gagal
+ * meskipun request benar-benar datang dari local FreeRADIUS host.
  */
 @Controller('radius')
 export class RadiusController {
@@ -35,11 +39,16 @@ export class RadiusController {
       throw new ForbiddenException('Akses ditolak');
     }
 
-    // Verifikasi shared secret internal
+    // Defense-in-depth: validasi header jika modul REST mengirimkannya.
+    // Keamanan boundary tetap dijaga oleh localhost-only check di atas.
     const secret = req.headers['x-radius-secret'] as string;
-    if (!secret || secret !== this.RADIUS_SECRET) {
+    if (secret && secret !== this.RADIUS_SECRET) {
       this.logger.warn('RADIUS endpoint: secret tidak valid');
       throw new UnauthorizedException('Secret tidak valid');
+    }
+
+    if (!secret) {
+      this.logger.debug('RADIUS endpoint: request localhost tanpa X-Radius-Secret');
     }
   }
 
