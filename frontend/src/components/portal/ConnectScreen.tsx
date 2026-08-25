@@ -23,7 +23,7 @@ export function ConnectScreen() {
             Siap Terhubung!
           </h1>
           <p className="text-sm text-muted-foreground max-w-xs mx-auto">
-            Anda telah selesai menonton iklan. Klik tombol di bawah untuk mengaktifkan akses internet.
+            Pilihan akses Anda siap diaktifkan. Klik tombol di bawah untuk terhubung ke internet.
           </p>
         </div>
 

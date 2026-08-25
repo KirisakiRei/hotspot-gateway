@@ -181,7 +181,7 @@ export default function AdminUsers() {
 
   const getActionTitle = () => {
     switch (confirmAction?.type) {
-      case 'kick': return 'Putuskan Pengguna';
+      case 'kick': return 'Tutup Sesi di Panel';
       case 'block': return 'Blokir Pengguna';
       case 'unblock': return 'Buka Blokir Pengguna';
       case 'delete': return 'Hapus Pengguna';
@@ -191,7 +191,7 @@ export default function AdminUsers() {
 
   const getActionMessage = () => {
     switch (confirmAction?.type) {
-      case 'kick': return `Apakah Anda yakin ingin memutus koneksi ${confirmAction.userName}?`;
+      case 'kick': return `Tutup catatan sesi ${confirmAction.userName} di panel? Koneksi fisik router tetap berakhir melalui Session-Timeout RADIUS.`;
       case 'block': return `Apakah Anda yakin ingin memblokir ${confirmAction.userName}? Pengguna tidak akan dapat masuk lagi.`;
       case 'unblock': return `Apakah Anda yakin ingin membuka blokir ${confirmAction.userName}?`;
       case 'delete': return `Apakah Anda yakin ingin menghapus ${confirmAction.userName}? Tindakan ini tidak dapat dibatalkan.`;
@@ -581,7 +581,7 @@ export default function AdminUsers() {
                   className="flex-1 h-10 rounded-xl bg-warning/10 text-warning font-medium text-sm hover:bg-warning/20 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <Power className="w-4 h-4" />
-                  Putuskan
+                  Tutup Sesi
                 </button>
                 {selectedUser.status === 'BLOCKED' ? (
                   <button 
@@ -653,7 +653,7 @@ export default function AdminUsers() {
                   }`}
                 >
                   {isExecuting && <Loader2 className="w-4 h-4 animate-spin" />}
-                  {confirmAction.type === 'kick' ? 'Putuskan' : 
+                   {confirmAction.type === 'kick' ? 'Tutup Sesi' : 
                    confirmAction.type === 'block' ? 'Blokir' : 
                    confirmAction.type === 'unblock' ? 'Buka Blokir' : 'Hapus'}
                 </button>

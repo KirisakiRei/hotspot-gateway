@@ -19,14 +19,15 @@ export class RouterService {
     const count = await this.prisma.router.count();
     if (count === 0) {
       const defaultName = 'ROUTER-001';
-      const defaultHost = '127.0.0.1';
+      const defaultHost = 'dynamic';
       await this.prisma.router.create({
         data: {
           name: defaultName,
           location: 'Main Hotspot Gateway',
           host: defaultHost,
           status: 'ACTIVE',
-          lastSeenAt: new Date(),
+          // Tidak boleh dianggap online sebelum paket RADIUS benar-benar tiba.
+          lastSeenAt: null,
         },
       });
       this.logger.log(`Default Router (${defaultName}) seeded successfully`);

@@ -62,6 +62,19 @@ export class RadiusService {
       throw new UnauthorizedException('Voucher tidak ditemukan');
     }
 
+    // User yang diblokir harus ditolak sebelum Access-Accept. Mengubah status
+    // hanya di UI tanpa guard ini adalah keamanan bohongan.
+    if (mac) {
+      const blockedUser = await this.prisma.user.findFirst({
+        where: { macAddress: mac, isBlocked: true },
+        select: { id: true },
+      });
+      if (blockedUser) {
+        this.logger.warn(`RADIUS authorize: MAC diblokir mac=${mac}`);
+        throw new UnauthorizedException('Perangkat ini diblokir oleh admin');
+      }
+    }
+
     // Validasi password = kode (A-PAP: user/pass = kode voucher)
     if (dto.password?.trim().toUpperCase() !== code) {
       this.logger.warn(`RADIUS authorize: password tidak cocok untuk code=${code}`);
@@ -169,13 +182,47 @@ export class RadiusService {
 
     if (statusType === 'Start') {
       await this._handleAccountingStart(voucher.id, mac, ip, router?.id);
+    } else if (statusType === 'Interim-Update') {
+      const sessionTime = parseInt(dto.acctSessionTime || '0', 10);
+      const bytesIn = parseInt(dto.acctInputOctets || '0', 10);
+      const bytesOut = parseInt(dto.acctOutputOctets || '0', 10);
+      await this._handleAccountingInterim(voucher.id, mac, sessionTime, bytesIn, bytesOut, ip);
     } else if (statusType === 'Stop') {
       const sessionTime = parseInt(dto.acctSessionTime || '0', 10);
       const bytesIn = parseInt(dto.acctInputOctets || '0', 10);
       const bytesOut = parseInt(dto.acctOutputOctets || '0', 10);
       await this._handleAccountingStop(voucher.id, mac, sessionTime, bytesIn, bytesOut);
     }
-    // Interim-Update: hanya update lastSeenAt (sudah di atas)
+  }
+
+  private async _handleAccountingInterim(
+    voucherId: string,
+    mac: string | null,
+    sessionTime: number,
+    bytesIn: number,
+    bytesOut: number,
+    ip: string,
+  ): Promise<void> {
+    if (!mac) return;
+
+    try {
+      await this.prisma.$transaction([
+        this.prisma.session.updateMany({
+          where: { macAddress: mac, endedAt: null },
+          data: { bytesIn: BigInt(bytesIn), bytesOut: BigInt(bytesOut), ipAddress: ip },
+        }),
+        this.prisma.user.updateMany({
+          where: { macAddress: mac, status: 'ONLINE' },
+          data: { quotaUsed: BigInt(bytesIn + bytesOut), timeUsed: sessionTime, ipAddress: ip },
+        }),
+        this.prisma.voucher.updateMany({
+          where: { id: voucherId, status: 'ACTIVE' },
+          data: { quotaUsed: BigInt(bytesIn + bytesOut), timeUsed: sessionTime },
+        }),
+      ]);
+    } catch (err) {
+      this.logger.error(`Accounting-Interim error: ${getErrorMessage(err)}`);
+    }
   }
 
   private async _handleAccountingStart(
@@ -214,6 +261,13 @@ export class RadiusService {
           },
         });
       }
+
+      // Accounting-Start dapat terkirim ulang. Tutup record lama agar satu MAC
+      // hanya memiliki satu sesi DB aktif pada waktu bersamaan.
+      await this.prisma.session.updateMany({
+        where: { macAddress: mac, endedAt: null },
+        data: { endedAt: new Date() },
+      });
 
       // Buat session baru
       await this.prisma.session.create({

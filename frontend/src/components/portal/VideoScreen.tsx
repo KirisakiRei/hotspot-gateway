@@ -4,6 +4,10 @@ import { usePortal } from '@/contexts/PortalContext';
 
 // Timeout maksimal buffering sebelum tombol darurat dibuka (5 detik)
 const BUFFER_STALL_TIMEOUT_MS = 5000;
+// Captive Network Assistant (browser popup WiFi Android/iOS) kadang tidak
+// mengirim event `ended` walau video sudah selesai. Fallback ini mencegah
+// portal terkunci selamanya pada perangkat tersebut.
+const DEFAULT_AD_DURATION_SECONDS = 15;
 
 export function VideoScreen() {
   const { state, trackAdView, trackAdComplete, loadAdvertisement, setStep } = usePortal();
@@ -20,6 +24,7 @@ export function VideoScreen() {
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const stallTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const completionFallbackRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hasTrackedView = useRef(false);
 
   // Iklan TIDAK BISA di-skip: tombol hanya aktif ketika video selesai / error / stall
@@ -31,6 +36,13 @@ export function VideoScreen() {
     if (stallTimeoutRef.current) {
       clearTimeout(stallTimeoutRef.current);
       stallTimeoutRef.current = null;
+    }
+  };
+
+  const clearCompletionFallback = () => {
+    if (completionFallbackRef.current) {
+      clearTimeout(completionFallbackRef.current);
+      completionFallbackRef.current = null;
     }
   };
 
@@ -53,12 +65,24 @@ export function VideoScreen() {
       setIsPlaying(false);
       hasTrackedView.current = false;
       clearStallTimeout();
+
+      // Jangan bergantung mutlak pada event video browser captive portal.
+      const expectedDuration = Math.max(
+        advertisement.duration || 0,
+        DEFAULT_AD_DURATION_SECONDS,
+      );
+      completionFallbackRef.current = setTimeout(() => {
+        setStallBypass(true);
+      }, expectedDuration * 1000);
     }
+
+    return clearCompletionFallback;
   }, [advertisement]);
 
   useEffect(() => {
     return () => {
       clearStallTimeout();
+      clearCompletionFallback();
     };
   }, []);
 
@@ -94,6 +118,7 @@ export function VideoScreen() {
 
   const handleVideoEnded = () => {
     clearStallTimeout();
+    clearCompletionFallback();
     setIsPlaying(false);
     setIsBuffering(false);
     setVideoEnded(true);
@@ -102,6 +127,7 @@ export function VideoScreen() {
 
   const handleVideoError = () => {
     clearStallTimeout();
+    clearCompletionFallback();
     setIsPlaying(false);
     setIsBuffering(false);
     setVideoError('Video gagal diputar. Anda tetap dapat melanjutkan.');
@@ -123,7 +149,7 @@ export function VideoScreen() {
   };
 
   const handleContinue = () => {
-    if (!isUnlocked || connecting) return;
+    if (!isUnlocked) return;
 
     if (!hasTrackedView.current) {
       trackAdView();
@@ -135,7 +161,8 @@ export function VideoScreen() {
       trackAdComplete(watchTime);
     }
 
-    setStep('connect');
+    // Flow baru: setelah iklan user harus memilih akses 1 jam atau kuesioner.
+    setStep('choice');
   };
 
   const getVideoUrl = () => advertisement?.videoUrl || '';
@@ -165,11 +192,11 @@ export function VideoScreen() {
             {error || 'Anda tetap dapat terhubung ke internet gratis.'}
           </p>
           <button
-            onClick={() => setStep('connect')}
+            onClick={() => setStep('choice')}
             className="w-full h-12 rounded-xl bg-primary text-primary-foreground font-semibold hover:opacity-90 transition-all flex items-center justify-center gap-2"
           >
             <Wifi className="w-5 h-5" />
-            Lanjutkan ke Koneksi
+            Pilih Akses Internet
           </button>
           {error && (
             <button

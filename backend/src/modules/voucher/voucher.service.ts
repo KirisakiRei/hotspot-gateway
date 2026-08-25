@@ -12,7 +12,6 @@ import {
 } from './dto/voucher-profile.dto';
 import { GenerateVoucherDto, RedeemVoucherDto } from './dto/voucher.dto';
 import { Prisma, Voucher, VoucherProfile, VoucherStatus } from '@prisma/client';
-import { MikrotikService } from '@/modules/mikrotik/mikrotik.service';
 import { SessionService } from '@/modules/session/session.service';
 import { normalizeMac } from '@/common/utils/mac';
 import { getErrorMessage, getPrismaUniqueTarget, isPrismaUniqueViolation } from '@/common/utils/error';
@@ -24,7 +23,6 @@ export class VoucherService {
 
   constructor(
     private prisma: PrismaService,
-    private mikrotikService: MikrotikService,
     private sessionService: SessionService,
   ) {}
 
@@ -54,138 +52,21 @@ export class VoucherService {
       throw new BadRequestException(`Profile with name "${createDto.name}" already exists`);
     }
 
-    // STEP 3: Check Mikrotik connection (Graceful fallback if router offline)
-    try {
-      await this.mikrotikService.checkConnection();
-    } catch {
-      // Ignore initial ping failure
-    }
-
-    // STEP 4: Try creating in Mikrotik (synchronous if online, queued if offline)
-    if (this.mikrotikService.getConnectionStatus()) {
-      this.logger.log(`Provisioning profile "${createDto.name}" in Mikrotik router`);
-      try {
-        const sessionTimeout = createDto.duration ? `${createDto.duration}m` : undefined;
-        let rateLimit: string | undefined;
-        if (createDto.uploadSpeed && createDto.downloadSpeed) {
-          rateLimit = `${createDto.uploadSpeed}k/${createDto.downloadSpeed}k`;
-        }
-
-        const mikrotikData = {
-          name: createDto.name,
-          sharedUsers: createDto.sharedUsers || 1,
-          rateLimit,
-          sessionTimeout,
-        };
-        
-        await this.mikrotikService.createHotspotProfile(mikrotikData);
-        this.logger.log(`Profile created in Mikrotik: ${createDto.name}`);
-      } catch (mikrotikError: unknown) {
-        const msg = mikrotikError instanceof Error ? mikrotikError.message : String(mikrotikError);
-        this.logger.warn(`Mikrotik profile synchronization warning: ${msg}`);
-      }
-    } else {
-      this.logger.warn(`Mikrotik is offline. Profile "${createDto.name}" created in database only.`);
-    }
-
-    // STEP 5: Create in database SECOND
+    // Direct RADIUS: VoucherProfile adalah source of truth di DB. Router tidak
+    // membutuhkan hotspot user profile lokal dan API 8728 memang dimatikan.
     let profile;
     try {
       profile = await this.prisma.voucherProfile.create({
         data: createDto,
       });
-      
-      // STEP 6: Refresh profile cache so the new profile is immediately available for edit
-      await this.mikrotikService.refreshProfileCache();
-      
       this.logger.log(`Profile successfully created: ${profile.name}`);
       return profile;
     } catch (dbError: unknown) {
       this.logger.error(`Database profile creation failed: ${getErrorMessage(dbError)}`);
-      try {
-        await this.mikrotikService.deleteHotspotProfile(createDto.name);
-        this.logger.log(`Cleaned up orphaned profile from Mikrotik: ${createDto.name}`);
-      } catch (cleanupError: unknown) {
-        this.logger.error(`Cleanup failed: ${getErrorMessage(cleanupError)}`);
-      }
       throw new InternalServerErrorException(
         `Failed to create profile in database: ${getErrorMessage(dbError)}`
       );
     }
-  }
-
-  // Async sync profile to Mikrotik
-  private async syncProfileToMikrotik(profile: VoucherProfile): Promise<void> {
-    try {
-      // Ensure connection
-      await this.mikrotikService.checkConnection();
-      
-      if (!this.mikrotikService.getConnectionStatus()) {
-        this.logger.warn(`Mikrotik not connected. Profile "${profile.name}" not synchronized.`);
-        return;
-      }
-
-      // Convert duration (minutes) to Mikrotik session-timeout format
-      const sessionTimeout = profile.duration ? `${profile.duration}m` : undefined;
-      
-      // Convert speeds to rate-limit format (upload/download)
-      let rateLimit: string | undefined;
-      if (profile.uploadSpeed && profile.downloadSpeed) {
-        rateLimit = `${profile.uploadSpeed}k/${profile.downloadSpeed}k`;
-      }
-
-      await this.mikrotikService.createHotspotProfile({
-        name: profile.name,
-        sharedUsers: profile.sharedUsers,
-        sessionTimeout,
-        rateLimit,
-      });
-      
-      this.logger.log(`Profile "${profile.name}" synchronized to Mikrotik router`);
-    } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : String(error);
-      this.logger.error(`Failed to synchronize profile "${profile.name}" to Mikrotik: ${message}`);
-      // Don't throw - profile is saved in database, can retry sync later
-    }
-  }
-
-  /**
-   * Sync all profiles from database to Mikrotik
-   * Use this to ensure all profiles exist in Mikrotik
-   */
-  async syncAllProfilesToMikrotik(): Promise<{ synced: number; failed: number; errors: string[] }> {
-    const profiles = await this.prisma.voucherProfile.findMany({
-      where: { isActive: true },
-    });
-
-    let synced = 0;
-    let failed = 0;
-    const errors: string[] = [];
-
-    this.logger.log(`Synchronizing ${profiles.length} voucher profiles to Mikrotik router`);
-
-    for (const profile of profiles) {
-      try {
-        // Check if profile already exists in Mikrotik
-        const exists = await this.mikrotikService.checkProfileExists(profile.name);
-        
-        if (!exists) {
-          await this.syncProfileToMikrotik(profile);
-          synced++;
-        } else {
-          this.logger.log(`Profile "${profile.name}" already exists in Mikrotik router`);
-          synced++;
-        }
-      } catch (error: unknown) {
-        const message = error instanceof Error ? error.message : String(error);
-        failed++;
-        errors.push(`${profile.name}: ${message}`);
-        this.logger.error(`Failed to synchronize profile "${profile.name}": ${message}`);
-      }
-    }
-
-    this.logger.log(`Profile synchronization completed: ${synced} synchronized, ${failed} failed`);
-    return { synced, failed, errors };
   }
 
   async findAllProfiles(activeOnly = false) {
@@ -219,53 +100,12 @@ export class VoucherService {
 
   async updateProfile(id: string, updateDto: UpdateVoucherProfileDto) {
     this.logger.log(`Updating profile ID: ${id}`);
-    
-    // Get existing profile (need old name for Mikrotik update)
-    const existing = await this.findProfile(id);
+    await this.findProfile(id);
 
-    // STEP 2: Check Mikrotik connection (Graceful fallback if offline)
-    try {
-      await this.mikrotikService.checkConnection();
-    } catch {
-      // Ignore
-    }
-
-    // STEP 3: Update in Mikrotik if online
-    if (this.mikrotikService.getConnectionStatus()) {
-      try {
-        const sessionTimeout = updateDto.duration ? `${updateDto.duration}m` : undefined;
-        let rateLimit: string | undefined;
-        if (updateDto.uploadSpeed && updateDto.downloadSpeed) {
-          rateLimit = `${updateDto.uploadSpeed}k/${updateDto.downloadSpeed}k`;
-        }
-
-        await this.mikrotikService.updateHotspotProfile(existing.name, {
-          sharedUsers: updateDto.sharedUsers,
-          sessionTimeout,
-          rateLimit,
-        });
-        this.logger.log(`Profile "${existing.name}" updated in Mikrotik`);
-        
-        if (updateDto.name && existing.name !== updateDto.name) {
-          this.logger.warn(`Profile name change requested but not supported in Mikrotik. Keeping name as "${existing.name}"`);
-          delete updateDto.name;
-        }
-      } catch (mikrotikError: unknown) {
-        const msg = mikrotikError instanceof Error ? mikrotikError.message : String(mikrotikError);
-        this.logger.warn(`Mikrotik profile update warning: ${msg}`);
-      }
-    } else {
-      this.logger.warn(`Mikrotik is offline. Profile "${existing.name}" updated in database only.`);
-    }
-
-    // STEP 4: Update in database SECOND
     const updated = await this.prisma.voucherProfile.update({
       where: { id },
       data: updateDto,
     });
-
-    // STEP 5: Refresh profile cache to ensure consistency
-    await this.mikrotikService.refreshProfileCache();
 
     this.logger.log(`Profile updated successfully: ${updated.name}`);
     return updated;
@@ -296,54 +136,22 @@ export class VoucherService {
       );
     }
 
-    // STEP 3: Check Mikrotik connection
-    await this.mikrotikService.checkConnection();
-    if (!this.mikrotikService.getConnectionStatus()) {
-      this.logger.error(`Mikrotik is offline. Aborting safe profile deletion.`);
-      throw new InternalServerErrorException('Mikrotik connection required for safe profile deletion');
-    }
-
-    // STEP 4: If force delete, delete vouchers from Mikrotik first (BATCH)
+    // Direct RADIUS tidak memiliki hotspot user/profile lokal untuk dibersihkan.
+    // Force delete mencabut voucher dari DB; sesi yang sudah Access-Accept tetap
+    // berakhir normal lewat Session-Timeout dan tidak dapat autentikasi ulang.
     if (voucherCount > 0 && forceDelete) {
-      this.logger.log(`Force deleting ${voucherCount} associated vouchers from router`);
-      
-      const vouchers = await this.prisma.voucher.findMany({
-        where: { profileId: id },
-        select: { code: true },
+      await this.prisma.$transaction(async (tx) => {
+        await tx.user.updateMany({
+          where: { voucher: { profileId: id } },
+          data: { voucherId: null },
+        });
+        await tx.voucher.deleteMany({ where: { profileId: id } });
+        await tx.voucherProfile.delete({ where: { id } });
       });
-
-      // Use batch delete for better performance
-      const usernames = vouchers.map(v => v.code);
-      const result = await this.mikrotikService.removeHotspotUsersBatch(usernames);
-      this.logger.log(`Batch deletion completed: ${result.success} succeeded, ${result.failed} failed`);
+      this.logger.warn(`Force deleted profile "${profile.name}" and ${voucherCount} DB vouchers`);
+      return { message: `Profile "${profile.name}" and ${voucherCount} vouchers deleted successfully` };
     }
 
-    // STEP 5: Delete profile from Mikrotik FIRST (synchronous)
-    try {
-      await this.mikrotikService.deleteHotspotProfile(profile.name);
-      this.logger.log(`Profile "${profile.name}" deleted from Mikrotik router`);
-    } catch (mikrotikError: unknown) {
-      const msg = mikrotikError instanceof Error ? mikrotikError.message : String(mikrotikError);
-      // If profile doesn't exist in Mikrotik, continue
-      if (msg.includes('not found') || msg.includes('no such')) {
-        this.logger.warn(`Profile "${profile.name}" was not found in Mikrotik router`);
-      } else {
-        this.logger.error(`Failed to delete profile from Mikrotik: ${msg}`);
-        throw new InternalServerErrorException(
-          `Failed to delete profile from Mikrotik: ${msg}`
-        );
-      }
-    }
-
-    // STEP 6: Delete vouchers from database (if force) - use transaction
-    if (voucherCount > 0 && forceDelete) {
-      const deleteResult = await this.prisma.voucher.deleteMany({
-        where: { profileId: id },
-      });
-      this.logger.log(`Deleted ${deleteResult.count} vouchers from database`);
-    }
-
-    // STEP 7: Delete profile from database LAST - handle already deleted
     try {
       await this.prisma.voucherProfile.delete({
         where: { id },
@@ -797,26 +605,6 @@ export class VoucherService {
       },
     });
 
-    // ==========================================
-    // MIKROTIK INTEGRATION - Add user to hotspot
-    // ==========================================
-    try {
-      // Use the profile from the voucher (not default)
-      await this.mikrotikService.addHotspotUser({
-        username: voucher.code,
-        password: voucher.code, // Using voucher code as both username/password
-        profile: voucher.profile.name, // ← CRITICAL: Use voucher's profile!
-        macAddress: (mac || user.macAddress) || undefined,
-        comment: `Voucher: ${voucher.profile.name} | ${user.phone} | ${user.name || 'Unknown'}`,
-      });
-      
-      this.logger.log(
-        `Added user ${voucher.code} to Mikrotik hotspot with profile: ${voucher.profile.name}`,
-      );
-    } catch (mikrotikError: unknown) {
-      this.logger.warn(`Failed to add user to Mikrotik router: ${getErrorMessage(mikrotikError)}`);
-    }
-
     // Log redemption
     await this.prisma.systemLog.create({
       data: {
@@ -1099,8 +887,11 @@ export class VoucherService {
       throw new BadRequestException('Voucher sudah digunakan oleh device lain');
     }
 
-    // 4. Check if MAC already has active session
-    const existingSession = await this.mikrotikService.getActiveSessionByMac(normalizedMac);
+    // 4. Check sesi DB (Direct RADIUS, tanpa query API router)
+    const existingSession = await this.prisma.session.findFirst({
+      where: { macAddress: normalizedMac, endedAt: null },
+      orderBy: { startedAt: 'desc' },
+    });
     if (existingSession) {
       this.logger.log(`MAC ${normalizedMac} already has active session`);
       return {
@@ -1111,35 +902,9 @@ export class VoucherService {
       };
     }
 
-    // 5. Siapkan hotspot user di router (username = password = kode voucher).
-    // Login final dilakukan native oleh browser via form POST ke $(link-login-only)
-    // (Opsi A-PAP), sehingga MikroTik yang memvalidasi & membuat sesi — bukan backend.
-    this.logger.log(`Preparing hotspot user for voucher: ${voucher.code} (profile: ${voucher.profile.name})`);
-    
-    try {
-      const userCreated = await this.mikrotikService.createOrUpdateHotspotUser(
-        voucher.code,
-        voucher.code,
-        voucher.profile.name,
-      );
-
-      if (!userCreated) {
-        this.logger.error(`Failed to configure hotspot user on router: ${voucher.code}`);
-        throw new BadRequestException('Gagal membuat user di Mikrotik. Profile mungkin tidak sesuai.');
-      }
-
-      this.logger.log(`Hotspot user ready on router: ${voucher.code}`);
-    } catch (error: unknown) {
-      const msg = error instanceof Error ? error.message : String(error);
-      this.logger.error(`Failed to prepare Mikrotik user: ${msg}`);
-      
-      if (error instanceof BadRequestException) {
-        throw error;
-      }
-      throw new InternalServerErrorException('Gagal menyiapkan user di Mikrotik. Silakan hubungi admin.');
-    }
-
-    // 6. Update voucher status — conditional update mencegah race condition
+    // 5. Kredensial akan diautentikasi oleh FreeRADIUS ketika form native
+    // dipost ke MikroTik. Jangan membuat hotspot user lokal.
+    // 6. Klaim voucher di DB; sesi dibuat hanya oleh Accounting-Start RADIUS.
     const now = new Date();
     const expiresAt = new Date(now.getTime() + voucher.profile.duration * 60 * 1000);
 
@@ -1164,7 +929,8 @@ export class VoucherService {
       throw new BadRequestException('Voucher sudah digunakan oleh device lain');
     }
 
-    // 7. Create or update User record
+    // 7. Buat/perbarui user sebagai OFFLINE; status ONLINE berasal dari
+    // RADIUS Accounting-Start, bukan dari endpoint persiapan kredensial.
     try {
       const existingUser = await this.prisma.user.findUnique({
         where: { macAddress: normalizedMac },
@@ -1175,8 +941,7 @@ export class VoucherService {
         const updateData: Prisma.UserUpdateInput = {
           voucher: { connect: { id: voucher.id } },
           ipAddress: ip,
-          status: 'ONLINE',
-          loginAt: now,
+          status: existingUser.isBlocked ? 'BLOCKED' : 'OFFLINE',
         };
         
         // If user doesn't have name, try to get it from user with same MAC
@@ -1215,25 +980,12 @@ export class VoucherService {
             phone: phone,
             name: name,
             voucherId: voucher.id,
-            status: 'ONLINE',
-            loginAt: now,
+            status: 'OFFLINE',
           },
         });
         this.logger.log(`Created user record for MAC: ${normalizedMac}${name ? ` (${name})` : ''}`);
       }
 
-      // Create session record
-      await this.prisma.session.create({
-        data: {
-          user: {
-            connect: { macAddress: normalizedMac },
-          },
-          startedAt: now,
-          ipAddress: ip,
-          macAddress: normalizedMac,
-        },
-      });
-      this.logger.log(`Created session record for MAC: ${normalizedMac}`);
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : String(error);
       this.logger.error(`Failed to create or update user record: ${msg}`);
@@ -1331,10 +1083,8 @@ export class VoucherService {
    * Used by portal logout functionality
    */
   async disconnectSession(mac: string) {
-    // Invalidasi cache agar status koneksi diperbarui segera setelah disconnect
-    this.mikrotikService.invalidateSessionCache(mac);
-
-    // 1. Unified kick via SessionService (Router + DB close)
+    // Direct RADIUS: tutup status lokal; router menghentikan sesi lewat
+    // Session-Timeout atau Accounting-Stop (tidak ada API router).
     try {
       await this.sessionService.kickSession(mac);
       this.logger.log(`Disconnected and closed session for MAC: ${mac}`);

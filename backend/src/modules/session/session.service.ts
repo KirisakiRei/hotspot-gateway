@@ -1,8 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '@/common/prisma.service';
-import { MikrotikService } from '@/modules/mikrotik/mikrotik.service';
 import { normalizeMac } from '@/common/utils/mac';
-import { getErrorMessage } from '@/common/utils/error';
 import type { MikrotikRecord } from '@/modules/mikrotik/mikrotik.types';
 
 @Injectable()
@@ -11,7 +9,6 @@ export class SessionService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly mikrotikService: MikrotikService,
   ) {}
 
   /**
@@ -135,20 +132,14 @@ export class SessionService {
   }
 
   /**
-   * Unified Kick: Memutuskan koneksi aktif di router sekaligus menutup sesi di DB
+   * Direct RADIUS tidak membuka API router. Menutup record sesi lokal adalah
+   * satu-satunya tindakan aman tanpa CoA/PoD yang dapat dijangkau router.
+   * Sesi fisik pada router akan berhenti lewat Session-Timeout atau Accounting-Stop.
    */
   async kickSession(mac: string): Promise<boolean> {
     const normalized = normalizeMac(mac);
     if (!normalized) return false;
 
-    // 1. Eksekusi kick di MikroTik API (seam adapter AAA)
-    try {
-      await this.mikrotikService.disconnectUserByMac(normalized);
-    } catch (error) {
-      this.logger.warn(`Gagal mengirim perintah disconnect router untuk MAC ${normalized}: ${getErrorMessage(error)}`);
-    }
-
-    // 2. Tutup seluruh baris Session yang masih terbuka di DB
     await this.closeOpenSessionByMac(normalized);
     return true;
   }

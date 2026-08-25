@@ -96,14 +96,6 @@ export class VoucherController {
     }
   }
 
-  @Post('profiles/sync')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(AdminRole.SUPER_ADMIN, AdminRole.ADMIN)
-  async syncProfilesToMikrotik() {
-    const result = await this.voucherService.syncAllProfilesToMikrotik();
-    return ApiResponseDto.success('Profiles synced to Mikrotik', result);
-  }
-
   // ==========================================
   // VOUCHERS (Admin)
   // ==========================================
